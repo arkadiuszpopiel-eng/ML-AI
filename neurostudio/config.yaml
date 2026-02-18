@@ -1,0 +1,91 @@
+server:
+  host: "0.0.0.0"
+  port: 7860
+
+inference:
+  # Path to llama.cpp server binary (auto-detected after install)
+  llama_server_path: null
+  # Default context size
+  context_size: 8192
+  # Number of GPU layers (-1 = all layers on GPU)
+  gpu_layers: -1
+  # Number of threads for CPU inference
+  threads: 8
+  # Maximum tokens to generate
+  max_tokens: 4096
+  # Temperature for generation
+  temperature: 0.7
+
+models:
+  # Directory where .gguf models are stored
+  directory: "models"
+  # Default model to load on startup (filename or null for manual selection)
+  default: null
+
+router:
+  # Enable automatic model routing based on task type
+  enabled: false
+  # Model assignments by task type (filename of .gguf model)
+  coding: null
+  chat: null
+  analysis: null
+  creative: null
+
+tools:
+  # Enable/disable tool categories
+  filesystem:
+    enabled: true
+    # Allowed directories (empty = all)
+    allowed_dirs: []
+    # Blocked directories
+    blocked_dirs:
+      - "C:\\Windows"
+      - "C:\\Program Files"
+      - "/usr"
+      - "/etc"
+      - "/sys"
+  code_executor:
+    enabled: true
+    # Timeout for code execution (seconds)
+    timeout: 30
+    # Allowed languages
+    languages:
+      - python
+      - powershell
+      - cmd
+  web_search:
+    enabled: true
+    # Max results per search
+    max_results: 5
+  web_fetch:
+    enabled: true
+    # Max page size to fetch (bytes)
+    max_size: 1048576
+  shell:
+    enabled: true
+    # Timeout for shell commands (seconds)
+    timeout: 30
+    # Blocked commands (safety)
+    blocked_commands:
+      - "rm -rf /"
+      - "format"
+      - "del /s /q C:\\"
+      - "shutdown"
+      - "reboot"
+
+agent:
+  # Maximum tool calls per conversation turn
+  max_tool_calls: 10
+  # System prompt for the agent
+  system_prompt: |
+    You are NeuroForge AI Assistant - a powerful local AI agent running on the user's computer.
+    You have access to tools that let you interact with the file system, execute code, search the web, and run shell commands.
+
+    When the user asks you to do something, think step by step:
+    1. Understand what the user wants
+    2. Decide which tools you need
+    3. Use the tools to accomplish the task
+    4. Report the results clearly
+
+    Be helpful, thorough, and safe. Always explain what you're doing before executing potentially impactful actions.
+    If a task seems dangerous or destructive, warn the user first.

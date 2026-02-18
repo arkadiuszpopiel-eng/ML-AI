@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NeuroForge - Local AI Studio</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">&#9889;</span>
+                    <span class="logo-text">NeuroForge</span>
+                </div>
+                <button id="btn-new-chat" class="btn btn-primary btn-sm" title="Nowy czat">+ Nowy</button>
+            </div>
+
+            <!-- Status -->
+            <div id="status-bar" class="status-bar">
+                <div class="status-indicator" id="status-dot"></div>
+                <span id="status-text">Brak modelu</span>
+            </div>
+
+            <!-- Conversation History -->
+            <div class="sidebar-section">
+                <h3 class="section-toggle" data-target="conversation-list">Historia <span class="toggle-arrow">&#9660;</span></h3>
+                <div id="conversation-list" class="section-content conversation-list">
+                    <div class="conversation-list-empty">Brak zapisanych rozmow</div>
+                </div>
+            </div>
+
+            <!-- Model Selection -->
+            <div class="sidebar-section">
+                <h3>Model</h3>
+                <select id="model-select" class="select-full">
+                    <option value="">-- Wybierz model --</option>
+                </select>
+                <div class="model-controls">
+                    <button id="btn-load-model" class="btn btn-sm btn-success">Zaladuj</button>
+                    <button id="btn-unload-model" class="btn btn-sm btn-danger" disabled>Wyladuj</button>
+                </div>
+            </div>
+
+            <!-- GPU Settings -->
+            <div class="sidebar-section collapsible">
+                <h3 class="section-toggle" data-target="gpu-settings">Ustawienia GPU <span class="toggle-arrow">&#9660;</span></h3>
+                <div id="gpu-settings" class="section-content">
+                    <label>Warstwy na GPU:
+                        <input type="number" id="gpu-layers" value="-1" min="-1" max="999" class="input-sm">
+                        <small>-1 = wszystko na GPU</small>
+                    </label>
+                    <label>Rozmiar kontekstu:
+                        <select id="context-size" class="select-full">
+                            <option value="4096">4K</option>
+                            <option value="8192" selected>8K</option>
+                            <option value="16384">16K</option>
+                            <option value="32768">32K</option>
+                        </select>
+                    </label>
+                    <label>Watki CPU:
+                        <input type="number" id="cpu-threads" value="8" min="1" max="32" class="input-sm">
+                    </label>
+                    <label>Temperatura:
+                        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" class="range-full">
+                        <span id="temp-value">0.7</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Model Download -->
+            <div class="sidebar-section collapsible">
+                <h3 class="section-toggle" data-target="model-download">Pobierz modele <span class="toggle-arrow">&#9660;</span></h3>
+                <div id="model-download" class="section-content">
+                    <div id="recommended-models"></div>
+                </div>
+            </div>
+
+            <!-- Documents (RAG) -->
+            <div class="sidebar-section collapsible">
+                <h3 class="section-toggle" data-target="documents-panel">Dokumenty (RAG) <span class="toggle-arrow">&#9660;</span></h3>
+                <div id="documents-panel" class="section-content">
+                    <div class="doc-upload-area">
+                        <input type="file" id="doc-file-input" class="hidden" accept=".txt,.md,.py,.js,.csv,.json,.xml,.html,.log,.cfg,.ini,.yaml,.yml">
+                        <button id="btn-upload-doc" class="btn btn-sm btn-primary" style="width:100%">&#128196; Zaladuj dokument</button>
+                    </div>
+                    <div id="documents-list" class="documents-list"></div>
+                </div>
+            </div>
+
+            <!-- System Info -->
+            <div class="sidebar-section">
+                <div id="system-info" class="system-info">
+                    <small>NeuroForge v0.2.0</small>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Mobile sidebar toggle -->
+        <button id="sidebar-toggle" class="sidebar-toggle">&#9776;</button>
+
+        <!-- Main Chat Area -->
+        <main id="main" class="main">
+            <!-- Top bar with templates and monitor -->
+            <div id="top-bar" class="top-bar">
+                <div class="top-bar-left">
+                    <button id="btn-templates" class="btn btn-sm btn-ghost" title="Szablony">&#9889; Szablony</button>
+                    <button id="btn-upload-file" class="btn btn-sm btn-ghost" title="Zalacz plik">&#128206; Plik</button>
+                </div>
+                <div class="top-bar-right">
+                    <button id="btn-monitor" class="btn btn-sm btn-ghost" title="Monitor systemu">&#128200; Monitor</button>
+                    <div id="mini-stats" class="mini-stats">
+                        <span id="mini-cpu" class="mini-stat" title="CPU">--</span>
+                        <span id="mini-ram" class="mini-stat" title="RAM">--</span>
+                        <span id="mini-gpu" class="mini-stat" title="GPU">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Templates Panel (hidden by default) -->
+            <div id="templates-panel" class="templates-panel hidden">
+                <div class="templates-header">
+                    <h3>Szablony promptow</h3>
+                    <button class="btn btn-sm btn-ghost" onclick="document.getElementById('templates-panel').classList.add('hidden')">&times;</button>
+                </div>
+                <div class="templates-categories">
+                    <button class="template-cat active" data-cat="all">Wszystkie</button>
+                    <button class="template-cat" data-cat="coding">Kodowanie</button>
+                    <button class="template-cat" data-cat="text">Tekst</button>
+                    <button class="template-cat" data-cat="tools">Narzedzia</button>
+                </div>
+                <div id="templates-grid" class="templates-grid"></div>
+            </div>
+
+            <!-- Monitor Panel (hidden by default) -->
+            <div id="monitor-panel" class="monitor-panel hidden">
+                <div class="monitor-header">
+                    <h3>Monitor systemu</h3>
+                    <button class="btn btn-sm btn-ghost" onclick="toggleMonitor()">&times;</button>
+                </div>
+                <div class="monitor-grid">
+                    <div class="monitor-card">
+                        <div class="monitor-label">CPU</div>
+                        <div class="monitor-bar"><div id="bar-cpu" class="monitor-fill" style="width:0%"></div></div>
+                        <div id="val-cpu" class="monitor-value">--%</div>
+                    </div>
+                    <div class="monitor-card">
+                        <div class="monitor-label">RAM</div>
+                        <div class="monitor-bar"><div id="bar-ram" class="monitor-fill" style="width:0%"></div></div>
+                        <div id="val-ram" class="monitor-value">--/-- GB</div>
+                    </div>
+                    <div class="monitor-card">
+                        <div class="monitor-label">Dysk</div>
+                        <div class="monitor-bar"><div id="bar-disk" class="monitor-fill" style="width:0%"></div></div>
+                        <div id="val-disk" class="monitor-value">--/-- GB</div>
+                    </div>
+                    <div class="monitor-card">
+                        <div class="monitor-label">GPU</div>
+                        <div class="monitor-bar"><div id="bar-gpu" class="monitor-fill gpu" style="width:0%"></div></div>
+                        <div id="val-gpu" class="monitor-value">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Messages -->
+            <div id="chat-messages" class="chat-messages">
+                <div class="welcome-message">
+                    <h1>&#9889; NeuroForge</h1>
+                    <p>Lokalne studio AI z pelnym dostepem do Twojego komputera.</p>
+                    <div class="capabilities">
+                        <div class="cap-item">
+                            <span class="cap-icon">&#128193;</span>
+                            <span>Pliki</span>
+                        </div>
+                        <div class="cap-item">
+                            <span class="cap-icon">&#128187;</span>
+                            <span>Kod</span>
+                        </div>
+                        <div class="cap-item">
+                            <span class="cap-icon">&#127760;</span>
+                            <span>Internet</span>
+                        </div>
+                        <div class="cap-item">
+                            <span class="cap-icon">&#9000;</span>
+                            <span>Shell</span>
+                        </div>
+                        <div class="cap-item">
+                            <span class="cap-icon">&#128196;</span>
+                            <span>RAG</span>
+                        </div>
+                    </div>
+                    <p class="hint">Zaladuj model z bocznego panelu, zeby zaczac.</p>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="chat-input-area">
+                <div id="file-attachment" class="file-attachment hidden">
+                    <span id="attached-file-name"></span>
+                    <button class="btn-remove-file" onclick="removeAttachment()">&times;</button>
+                </div>
+                <div class="input-container">
+                    <input type="file" id="chat-file-input" class="hidden">
+                    <textarea
+                        id="chat-input"
+                        placeholder="Napisz wiadomosc... (Enter = wyslij, Shift+Enter = nowa linia)"
+                        rows="1"
+                    ></textarea>
+                    <button id="btn-send" class="btn-send" title="Wyslij">
+                        <span>&#10148;</span>
+                    </button>
+                </div>
+                <div class="input-footer">
+                    <span id="typing-indicator" class="typing-indicator hidden">AI mysli...</span>
+                    <span class="input-hint">Model dziala lokalnie na Twoim komputerze</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

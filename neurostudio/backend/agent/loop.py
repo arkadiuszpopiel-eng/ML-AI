@@ -16,6 +16,7 @@ from ..config import load_config
 from ..inference.engine import engine
 from ..inference.router import select_model
 from ..inference.providers import provider_registry
+from ..usage import usage_tracker
 from ..tools.base import registry
 
 # Import tools to trigger registration
@@ -143,6 +144,19 @@ class AgentLoop:
                 logger.error("Inference error: %s", e)
                 yield {"type": "error", "message": f"Inference error: {str(e)}"}
                 return
+
+            # Track token usage
+            usage_data = response.get("usage", {})
+            if usage_data:
+                pid = cloud_provider.provider_id if cloud_provider else "local"
+                model_id = (cloud_provider.active_model if cloud_provider
+                            else (engine.current_model or "local"))
+                usage_tracker.record(pid, model_id, usage_data)
+                yield {
+                    "type": "usage_update",
+                    "session_tokens": usage_tracker.session_tokens,
+                    "session_cost": usage_tracker.session_cost,
+                }
 
             choice = response.get("choices", [{}])[0]
             message = choice.get("message", {})

@@ -252,12 +252,16 @@ ML-AI/
 - [x] **OpenRouter** - jeden klucz API → 8+ prekonfigurowanych modeli
 - [x] **UI: panel providerów** - wybór providera, model selector, dodawanie kluczy API
 - [x] **Agent loop integration** - cloud provider lub local engine, transparentnie
-- [x] **API:** GET /api/providers, POST activate/key, DELETE key
+- [x] **API:** GET /api/providers, POST activate/key, DELETE key + GET /api/usage, POST reset
 - [x] **Config:** sekcja providers w config.yaml z persystencją kluczy
-- [x] **Testy:** 36 testów jednostkowych (registry, all providers, format conversion)
-- [ ] **TODO (v0.4.1):** Routing po providerze (coding→Qwen, creative→Claude)
-- [ ] **TODO (v0.4.1):** Bufor kosztów - tracking tokenów / kosztów
-- [ ] **TODO (v0.4.1):** Tryb hybrydowy - lokalne dla prostych, chmurowe dla trudnych
+- [x] **Provider status bar** - widoczny na górze chatu (nazwa providera, model, tokeny, koszt)
+- [x] **Usage tracking** - śledzenie tokenów/kosztów per provider z szacunkiem cen
+- [x] **Panel zużycia** - karta per provider z: requests, tokeny in/out, koszt szacunkowy
+- [x] **Keys grid** - chipy w sidebarze pokazujące które API są skonfigurowane
+- [x] **Real-time updates** - WebSocket `usage_update` aktualizuje status bar na bieżąco
+- [x] **Testy:** 58 testów (36 providers + 22 usage tracking), 142 razem
+- [ ] **TODO (v0.5):** Routing po providerze (coding→Qwen, creative→Claude)
+- [ ] **TODO (v0.5):** Tryb hybrydowy - lokalne dla prostych, chmurowe dla trudnych
 
 ### v0.5 - Multi-Agent (DO ZROBIENIA)
 > Kilka agentów AI współpracuje nad złożonym zadaniem.

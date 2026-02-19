@@ -102,6 +102,10 @@ function handleWSMessage(data) {
             appendProviderInfo(data.provider, data.model);
             break;
 
+        case 'usage_update':
+            updateProviderBarUsage(data.session_tokens, data.session_cost);
+            break;
+
         case 'error':
             appendError(data.message);
             break;
@@ -752,6 +756,8 @@ async function loadProviders() {
         }
 
         updateProviderUI(data);
+        renderProviderKeysGrid(data);
+        updateProviderBar(data);
     } catch (e) {
         console.error('Failed to load providers:', e);
     }
@@ -860,6 +866,128 @@ async function saveProviderKey() {
     } catch (e) {
         keyStatus.textContent = 'Blad polaczenia';
         keyStatus.className = 'provider-key-status missing';
+    }
+}
+
+// ──── Provider Status Bar ────
+
+function updateProviderBar(data) {
+    const activeId = data.active_provider || 'local';
+    const provider = data.providers.find(p => p.id === activeId);
+    if (!provider) return;
+
+    const isCloud = activeId !== 'local';
+    const indicator = $('provider-bar-indicator');
+    indicator.className = 'provider-bar-indicator ' + (isCloud ? 'cloud' : 'local');
+
+    $('provider-bar-name').textContent = provider.name;
+    $('provider-bar-model').textContent = provider.active_model || '';
+
+    // Cost display only for cloud providers
+    const costEl = $('provider-bar-cost');
+    if (isCloud) {
+        costEl.classList.remove('hidden');
+    } else {
+        costEl.classList.add('hidden');
+    }
+}
+
+function updateProviderBarUsage(sessionTokens, sessionCost) {
+    $('provider-bar-tokens').textContent = formatTokenCount(sessionTokens) + ' tok';
+    const costEl = $('provider-bar-cost');
+    if (sessionCost > 0) {
+        costEl.textContent = '$' + sessionCost.toFixed(4);
+        costEl.classList.remove('hidden');
+    }
+}
+
+function formatTokenCount(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return String(n);
+}
+
+// ──── Provider Keys Grid ────
+
+function renderProviderKeysGrid(data) {
+    const grid = $('provider-keys-grid');
+    grid.innerHTML = '';
+    const activeId = data.active_provider || 'local';
+
+    for (const p of data.providers) {
+        // Skip local - always available
+        if (p.id === 'local') continue;
+
+        const chip = document.createElement('span');
+        const configured = !p.requires_api_key || p.has_api_key;
+        let cls = 'provider-key-chip';
+        if (configured) cls += ' configured';
+        if (p.id === activeId) cls += ' active-chip';
+        chip.className = cls;
+        chip.innerHTML = `<span class="chip-dot"></span>${escapeHtml(p.id)}`;
+        chip.title = p.name + (configured ? ' (skonfigurowany)' : ' (brak klucza)');
+        grid.appendChild(chip);
+    }
+}
+
+// ──── Usage Panel ────
+
+async function renderUsagePanel() {
+    const content = $('usage-panel-content');
+    try {
+        const resp = await fetch('/api/usage');
+        const data = await resp.json();
+
+        if (!data.providers || data.providers.length === 0) {
+            content.innerHTML = '<p class="usage-empty">Brak danych o zuzyciu. Wyslij wiadomosc aby zaczac sledzenie.</p>';
+            return;
+        }
+
+        let html = `<div class="usage-stat-row" style="margin-bottom:10px;font-weight:600">
+            <span>Sesja razem</span>
+            <span class="usage-stat-value">${formatTokenCount(data.session_tokens)} tok / $${data.session_cost_usd.toFixed(4)}</span>
+        </div>`;
+
+        for (const pu of data.providers) {
+            const isActive = pu.provider_id === data.active_provider;
+            html += `<div class="usage-provider-card${isActive ? ' active-card' : ''}">
+                <div class="usage-provider-header">
+                    <span class="usage-provider-name">${escapeHtml(pu.provider_name || pu.provider_id)}</span>
+                    ${isActive ? '<span class="usage-provider-active-badge">AKTYWNY</span>' : ''}
+                </div>
+                <div class="usage-stat-row">
+                    <span>Zapytan</span>
+                    <span class="usage-stat-value">${pu.requests}</span>
+                </div>
+                <div class="usage-stat-row">
+                    <span>Tokeny (in / out)</span>
+                    <span class="usage-stat-value">${formatTokenCount(pu.input_tokens)} / ${formatTokenCount(pu.output_tokens)}</span>
+                </div>
+                <div class="usage-stat-row">
+                    <span>Razem tokenow</span>
+                    <span class="usage-stat-value">${formatTokenCount(pu.total_tokens)}</span>
+                </div>
+                <div class="usage-stat-row">
+                    <span>Koszt (szacunek)</span>
+                    <span class="usage-stat-value">$${pu.estimated_cost_usd.toFixed(4)}</span>
+                </div>
+            </div>`;
+        }
+
+        content.innerHTML = html;
+    } catch (e) {
+        content.innerHTML = '<p class="usage-empty">Blad ladowania danych zuzycia</p>';
+    }
+}
+
+async function resetUsage() {
+    try {
+        await fetch('/api/usage/reset', { method: 'POST' });
+        $('provider-bar-tokens').textContent = '0 tok';
+        $('provider-bar-cost').textContent = '$0.00';
+        await renderUsagePanel();
+    } catch (e) {
+        console.error('Failed to reset usage:', e);
     }
 }
 
@@ -1047,6 +1175,17 @@ function setupEventListeners() {
     $('provider-api-key').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') saveProviderKey();
     });
+
+    // Usage panel controls
+    $('btn-usage-panel').addEventListener('click', () => {
+        const panel = $('usage-panel');
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) renderUsagePanel();
+    });
+    $('btn-close-usage').addEventListener('click', () => {
+        $('usage-panel').classList.add('hidden');
+    });
+    $('btn-reset-usage').addEventListener('click', resetUsage);
 
     // Router controls
     $('router-enabled').addEventListener('change', saveRouterConfig);

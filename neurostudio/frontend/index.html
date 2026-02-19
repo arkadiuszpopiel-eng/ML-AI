@@ -53,6 +53,10 @@
                     </div>
                     <button id="btn-activate-provider" class="btn btn-sm btn-primary" style="width:100%;margin-top:8px">Aktywuj</button>
                     <div id="provider-status" class="provider-status"></div>
+                    <div id="provider-keys-list" class="provider-keys-list" style="margin-top:10px">
+                        <small style="color:var(--text-secondary)">Skonfigurowane API:</small>
+                        <div id="provider-keys-grid" class="provider-keys-grid"></div>
+                    </div>
                 </div>
             </div>
 
@@ -158,7 +162,7 @@
             <!-- System Info -->
             <div class="sidebar-section">
                 <div id="system-info" class="system-info">
-                    <small>NeuroForge v0.3.0</small>
+                    <small>NeuroForge v0.4.0</small>
                 </div>
             </div>
         </aside>
@@ -168,6 +172,34 @@
 
         <!-- Main Chat Area -->
         <main id="main" class="main">
+            <!-- Active Provider Status Bar -->
+            <div id="provider-bar" class="provider-bar">
+                <div class="provider-bar-left">
+                    <span id="provider-bar-indicator" class="provider-bar-indicator local"></span>
+                    <span id="provider-bar-name" class="provider-bar-name">Lokalny (llama.cpp)</span>
+                    <span id="provider-bar-model" class="provider-bar-model"></span>
+                </div>
+                <div class="provider-bar-right">
+                    <span id="provider-bar-tokens" class="provider-bar-tokens" title="Tokeny w tej sesji">0 tok</span>
+                    <span id="provider-bar-cost" class="provider-bar-cost hidden" title="Szacunkowy koszt">$0.00</span>
+                    <button id="btn-usage-panel" class="btn btn-xs btn-ghost" title="Zuzycie AI">Zuzycie</button>
+                </div>
+            </div>
+
+            <!-- Usage Panel (hidden by default) -->
+            <div id="usage-panel" class="usage-panel hidden">
+                <div class="usage-panel-header">
+                    <h3>Zuzycie AI</h3>
+                    <button class="btn btn-sm btn-ghost" id="btn-close-usage">&times;</button>
+                </div>
+                <div id="usage-panel-content" class="usage-panel-content">
+                    <p class="usage-empty">Brak danych o zuzyciu</p>
+                </div>
+                <div class="usage-panel-footer">
+                    <button id="btn-reset-usage" class="btn btn-sm btn-ghost">Resetuj statystyki</button>
+                </div>
+            </div>
+
             <!-- Top bar with templates and monitor -->
             <div id="top-bar" class="top-bar">
                 <div class="top-bar-left">

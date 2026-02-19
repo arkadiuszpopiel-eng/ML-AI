@@ -26,6 +26,7 @@ from .agent.loop import agent
 from .inference.router import (
     get_router_config, update_router_config, detect_task_type, get_task_scores
 )
+from .usage import usage_tracker
 from .storage import (
     save_conversation, load_conversation, list_conversations,
     delete_conversation, update_conversation_title,
@@ -256,6 +257,28 @@ async def api_delete_provider_key(provider_id: str):
         config["providers"]["active"] = "local"
         save_config(config)
 
+    return {"success": True}
+
+
+# ──────────────────────── Usage Tracking ────────────────────────
+
+@app.get("/api/usage")
+async def api_get_usage():
+    """Get current usage statistics for all providers."""
+    data = usage_tracker.to_dict()
+    # Enrich with provider info
+    for p_usage in data["providers"]:
+        provider = provider_registry.get(p_usage["provider_id"])
+        if provider:
+            p_usage["provider_name"] = provider.provider_name
+    data["active_provider"] = provider_registry._active_provider_id
+    return data
+
+
+@app.post("/api/usage/reset")
+async def api_reset_usage():
+    """Reset all usage statistics."""
+    usage_tracker.reset()
     return {"success": True}
 
 

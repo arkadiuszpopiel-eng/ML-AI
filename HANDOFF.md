@@ -213,15 +213,17 @@ ML-AI/
 - [x] Monitor systemowy (CPU/RAM/dysk/GPU) z auto-odświeżaniem
 - [x] Instalator: install.py + install.bat + run.py
 
-### v0.2 - Semantic Router (80% GOTOWE)
+### v0.2 - Semantic Router (GOTOWE)
 > Inteligentne przełączanie modeli na podstawie typu zadania.
 
 - [x] Detekcja typu zadania (coding/analysis/creative/chat) wg słów kluczowych
 - [x] Router z config.yaml (przypisanie modelu do typu zadania)
 - [x] Automatyczne przełączanie modelu w agent loop
-- [ ] **TODO:** Panel UI do konfiguracji routera (włącz/wyłącz, przypisania modeli)
-- [ ] **TODO:** Włączenie routera domyślnie po dodaniu UI
-- [ ] **TODO:** Lepszy scoring (embedding-based zamiast regex)
+- [x] **Panel UI** do konfiguracji routera (włącz/wyłącz, przypisania modeli per task type)
+- [x] **Router domyślnie włączony** (enabled: true w config.yaml)
+- [x] **TF-IDF semantic scoring** (cosine similarity z profilami zadań, keyword fallback)
+- [x] **API:** GET/POST /api/router + POST /api/router/test (klasyfikacja z wizualizacją)
+- [x] **Testy:** 24 testy jednostkowe (SemanticScorer, detect, config, fallback)
 
 ### v0.3 - RAG + Quality (GOTOWE - aktualny stan)
 > Baza wiedzy z dokumentów + testy + bezpieczeństwo + Docker.
@@ -230,7 +232,7 @@ ML-AI/
 - [x] Upload i indeksowanie dokumentów przez UI
 - [x] Automatyczne wstrzykiwanie kontekstu RAG do promptów agenta
 - [x] API: upload, index-text, search, delete dokumentów
-- [x] **Testy jednostkowe (pytest)** - 60 testów w 6 modułach
+- [x] **Testy jednostkowe (pytest)** - 84 testów w 7 modułach
 - [x] **Docker Compose** - Dockerfile + docker-compose.yml z named volumes
 - [x] **Bezpieczeństwo:** fix XSS, path traversal, command injection, onclick injection
 - [x] **Temperature** podłączony: UI slider -> WebSocket -> agent -> inference

@@ -1,5 +1,5 @@
 /**
- * NeuroForge - Frontend Application v0.2.0
+ * NeuroForge - Frontend Application v0.3.0
  * Handles WebSocket chat, model management, conversation history,
  * system monitor, prompt templates, RAG, and file upload.
  */
@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConversationHistory();
     loadDocumentsList();
     loadTemplates();
+    loadRouterConfig();
     setupEventListeners();
     startMiniMonitor();
 });
@@ -720,6 +721,92 @@ function removeAttachment() {
     $('attached-file-name').textContent = '';
 }
 
+// ──── Semantic Router ────
+
+async function loadRouterConfig() {
+    try {
+        const resp = await fetch('/api/router');
+        const data = await resp.json();
+
+        $('router-enabled').checked = data.enabled;
+
+        // Populate model selects for each task type
+        const taskTypes = ['coding', 'analysis', 'creative', 'chat'];
+        for (const tt of taskTypes) {
+            const sel = $(`router-${tt}`);
+            sel.innerHTML = '<option value="">-- domyslny model --</option>';
+            for (const m of data.available_models) {
+                const opt = document.createElement('option');
+                opt.value = m.filename;
+                opt.textContent = `${m.base_name} (${m.quantization})`;
+                if (data.assignments[tt] === m.filename) {
+                    opt.selected = true;
+                }
+                sel.appendChild(opt);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load router config:', e);
+    }
+}
+
+async function saveRouterConfig() {
+    const enabled = $('router-enabled').checked;
+    const assignments = {
+        coding: $('router-coding').value || null,
+        analysis: $('router-analysis').value || null,
+        creative: $('router-creative').value || null,
+        chat: $('router-chat').value || null,
+    };
+
+    try {
+        await fetch('/api/router', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled, assignments }),
+        });
+    } catch (e) {
+        console.error('Failed to save router config:', e);
+    }
+}
+
+async function testRouter() {
+    const msg = $('router-test-input').value.trim();
+    if (!msg) return;
+
+    const resultDiv = $('router-test-result');
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = 'Analizuję...';
+
+    try {
+        const resp = await fetch('/api/router/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg }),
+        });
+        const data = await resp.json();
+
+        const maxScore = Math.max(...Object.values(data.scores), 0.01);
+        let html = '';
+        for (const [type, score] of Object.entries(data.scores)) {
+            const pct = Math.round((score / maxScore) * 100);
+            const isWinner = type === data.detected_type;
+            html += `
+                <div class="router-score-bar">
+                    <span class="router-score-label">${type}</span>
+                    <div class="router-score-track">
+                        <div class="router-score-fill${isWinner ? ' winner' : ''}" style="width:${pct}%"></div>
+                    </div>
+                    <span class="router-score-value">${(score * 100).toFixed(1)}%</span>
+                </div>`;
+        }
+        html += `<div class="router-detected">→ ${data.detected_type}</div>`;
+        resultDiv.innerHTML = html;
+    } catch (e) {
+        resultDiv.innerHTML = 'Blad testu';
+    }
+}
+
 // ──── Event Listeners ────
 
 function setupEventListeners() {
@@ -807,6 +894,16 @@ function setupEventListeners() {
         }
     });
 
+    // Router controls
+    $('router-enabled').addEventListener('change', saveRouterConfig);
+    document.querySelectorAll('.router-select').forEach(sel => {
+        sel.addEventListener('change', saveRouterConfig);
+    });
+    $('btn-router-test').addEventListener('click', testRouter);
+    $('router-test-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') testRouter();
+    });
+
     // Document upload (RAG)
     $('btn-upload-doc').addEventListener('click', () => {
         $('doc-file-input').click();
@@ -871,3 +968,4 @@ window.downloadModel = downloadModel;
 window.removeDocument = removeDocument;
 window.removeAttachment = removeAttachment;
 window.toggleMonitor = toggleMonitor;
+window.testRouter = testRouter;

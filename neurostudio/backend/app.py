@@ -22,6 +22,9 @@ from .inference.model_manager import (
     list_models, get_model_path, download_model, get_recommended_models
 )
 from .agent.loop import agent
+from .inference.router import (
+    get_router_config, update_router_config, detect_task_type, get_task_scores
+)
 from .storage import (
     save_conversation, load_conversation, list_conversations,
     delete_conversation, update_conversation_title,
@@ -46,7 +49,7 @@ async def lifespan(app: FastAPI):
     await engine.stop()
 
 
-app = FastAPI(title="NeuroForge", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="NeuroForge", version="0.3.0", lifespan=lifespan)
 
 # Mount static files
 app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
@@ -166,6 +169,41 @@ def _deep_merge(base: dict, override: dict):
             _deep_merge(base[key], value)
         else:
             base[key] = value
+
+
+# ──────────────────────── Router ────────────────────────
+
+@app.get("/api/router")
+async def api_get_router():
+    """Get router configuration with available models."""
+    return get_router_config()
+
+
+class RouterUpdateRequest(BaseModel):
+    enabled: bool | None = None
+    assignments: dict | None = None
+
+
+@app.post("/api/router")
+async def api_update_router(req: RouterUpdateRequest):
+    """Update router configuration (enable/disable, model assignments)."""
+    return update_router_config(enabled=req.enabled, assignments=req.assignments)
+
+
+class RouterTestRequest(BaseModel):
+    message: str
+
+
+@app.post("/api/router/test")
+async def api_test_router(req: RouterTestRequest):
+    """Test the router - classify a message and return scores."""
+    task_type = detect_task_type(req.message)
+    scores = get_task_scores(req.message)
+    return {
+        "message": req.message,
+        "detected_type": task_type,
+        "scores": {k: round(v, 4) for k, v in scores.items()},
+    }
 
 
 # ──────────────────────── Chat (WebSocket) ────────────────────────

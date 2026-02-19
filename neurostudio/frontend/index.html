@@ -78,6 +78,47 @@
                 </div>
             </div>
 
+            <!-- Semantic Router -->
+            <div class="sidebar-section collapsible">
+                <h3 class="section-toggle" data-target="router-panel">Semantic Router <span class="toggle-arrow">&#9660;</span></h3>
+                <div id="router-panel" class="section-content">
+                    <div class="router-toggle-row">
+                        <span class="router-label">Auto-routing</span>
+                        <label class="switch">
+                            <input type="checkbox" id="router-enabled">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div id="router-assignments" class="router-assignments">
+                        <label>Kodowanie:
+                            <select id="router-coding" class="select-full router-select">
+                                <option value="">-- domyslny model --</option>
+                            </select>
+                        </label>
+                        <label>Analiza:
+                            <select id="router-analysis" class="select-full router-select">
+                                <option value="">-- domyslny model --</option>
+                            </select>
+                        </label>
+                        <label>Kreatywne:
+                            <select id="router-creative" class="select-full router-select">
+                                <option value="">-- domyslny model --</option>
+                            </select>
+                        </label>
+                        <label>Chat:
+                            <select id="router-chat" class="select-full router-select">
+                                <option value="">-- domyslny model --</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="router-test-area">
+                        <input type="text" id="router-test-input" class="input-sm" placeholder="Testuj routing...">
+                        <button id="btn-router-test" class="btn btn-sm btn-ghost" style="margin-top:4px;width:100%">Testuj</button>
+                        <div id="router-test-result" class="router-test-result hidden"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Documents (RAG) -->
             <div class="sidebar-section collapsible">
                 <h3 class="section-toggle" data-target="documents-panel">Dokumenty (RAG) <span class="toggle-arrow">&#9660;</span></h3>
@@ -93,7 +134,7 @@
             <!-- System Info -->
             <div class="sidebar-section">
                 <div id="system-info" class="system-info">
-                    <small>NeuroForge v0.2.0</small>
+                    <small>NeuroForge v0.3.0</small>
                 </div>
             </div>
         </aside>

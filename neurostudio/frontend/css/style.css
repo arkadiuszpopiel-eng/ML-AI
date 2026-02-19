@@ -1,4 +1,4 @@
-/* NeuroForge - Local AI Studio v0.2.0 - Responsive UI */
+/* NeuroForge - Local AI Studio v0.3.0 - Responsive UI */
 
 :root {
     --bg-primary: #0f0f14;
@@ -499,6 +499,143 @@ label small {
     font-size: 0.78em;
     color: var(--text-primary);
     font-family: monospace;
+}
+
+/* ──── Semantic Router ──── */
+
+.router-toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.router-label {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    transition: all var(--transition);
+}
+
+.switch-slider::before {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 2px;
+    bottom: 2px;
+    background: var(--text-secondary);
+    border-radius: 50%;
+    transition: all var(--transition);
+}
+
+.switch input:checked + .switch-slider {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.switch input:checked + .switch-slider::before {
+    transform: translateX(18px);
+    background: white;
+}
+
+.router-assignments {
+    margin-bottom: 8px;
+}
+
+.router-assignments label {
+    margin-bottom: 6px;
+}
+
+.router-select {
+    font-size: 0.82em;
+    padding: 6px 8px;
+}
+
+.router-test-area {
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+.router-test-result {
+    margin-top: 6px;
+    padding: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    font-size: 0.78em;
+    font-family: monospace;
+    line-height: 1.5;
+}
+
+.router-score-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.router-score-label {
+    width: 65px;
+    color: var(--text-secondary);
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.router-score-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-primary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.router-score-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.router-score-fill.winner {
+    background: var(--success);
+}
+
+.router-score-value {
+    width: 35px;
+    color: var(--text-muted);
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.router-detected {
+    text-align: center;
+    margin-top: 6px;
+    padding: 4px;
+    color: var(--success);
+    font-weight: 600;
+    font-size: 0.85em;
 }
 
 /* ──── Documents (RAG) ──── */

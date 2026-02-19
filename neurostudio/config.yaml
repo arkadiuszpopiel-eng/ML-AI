@@ -24,7 +24,7 @@ models:
 
 router:
   # Enable automatic model routing based on task type
-  enabled: false
+  enabled: true
   # Model assignments by task type (filename of .gguf model)
   coding: null
   chat: null

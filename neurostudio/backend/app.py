@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from .config import load_config, save_config, get_models_dir, BASE_DIR
 from .inference.engine import engine
+from .inference.providers import provider_registry
 from .inference.model_manager import (
     list_models, get_model_path, download_model, get_recommended_models
 )
@@ -169,6 +170,93 @@ def _deep_merge(base: dict, override: dict):
             _deep_merge(base[key], value)
         else:
             base[key] = value
+
+
+# ──────────────────────── Providers ────────────────────────
+
+@app.get("/api/providers")
+async def api_list_providers():
+    """List all available providers with their status."""
+    return provider_registry.to_dict()
+
+
+class ProviderActivateRequest(BaseModel):
+    provider_id: str
+    model: str | None = None
+
+
+@app.post("/api/providers/activate")
+async def api_activate_provider(req: ProviderActivateRequest):
+    """Set the active provider and optionally select a model."""
+    provider = provider_registry.get(req.provider_id)
+    if not provider:
+        raise HTTPException(404, f"Unknown provider: {req.provider_id}")
+
+    if not provider_registry.set_active(req.provider_id):
+        raise HTTPException(400, f"Provider not available: {req.provider_id}")
+
+    if req.model:
+        provider._active_model = req.model
+
+    # Persist active provider choice
+    config = load_config()
+    if "providers" not in config:
+        config["providers"] = {}
+    config["providers"]["active"] = req.provider_id
+    save_config(config)
+
+    return {"success": True, "active": provider_registry.to_dict()}
+
+
+class ProviderKeyRequest(BaseModel):
+    provider_id: str
+    api_key: str
+
+
+@app.post("/api/providers/key")
+async def api_set_provider_key(req: ProviderKeyRequest):
+    """Set the API key for a provider."""
+    provider = provider_registry.get(req.provider_id)
+    if not provider:
+        raise HTTPException(404, f"Unknown provider: {req.provider_id}")
+
+    # Update provider config in memory
+    provider.config["api_key"] = req.api_key
+
+    # Persist to config.yaml
+    config = load_config()
+    if "providers" not in config:
+        config["providers"] = {}
+    if req.provider_id not in config["providers"]:
+        config["providers"][req.provider_id] = {}
+    config["providers"][req.provider_id]["api_key"] = req.api_key
+    save_config(config)
+
+    return {"success": True, "provider": provider.to_dict()}
+
+
+@app.delete("/api/providers/key/{provider_id}")
+async def api_delete_provider_key(provider_id: str):
+    """Remove the API key for a provider."""
+    provider = provider_registry.get(provider_id)
+    if not provider:
+        raise HTTPException(404, f"Unknown provider: {provider_id}")
+
+    provider.config.pop("api_key", None)
+
+    config = load_config()
+    providers_cfg = config.get("providers", {})
+    if provider_id in providers_cfg:
+        providers_cfg[provider_id].pop("api_key", None)
+        save_config(config)
+
+    # If this was active, fallback to local
+    if provider_registry._active_provider_id == provider_id:
+        provider_registry.set_active("local")
+        config["providers"]["active"] = "local"
+        save_config(config)
+
+    return {"success": True}
 
 
 # ──────────────────────── Router ────────────────────────

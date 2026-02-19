@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDocumentsList();
     loadTemplates();
     loadRouterConfig();
+    loadProviders();
     setupEventListeners();
     startMiniMonitor();
 });
@@ -95,6 +96,10 @@ function handleWSMessage(data) {
 
         case 'model_switch':
             appendModelSwitch(data.from, data.to);
+            break;
+
+        case 'provider_info':
+            appendProviderInfo(data.provider, data.model);
             break;
 
         case 'error':
@@ -231,7 +236,15 @@ function appendToolResult(toolName, result) {
 function appendModelSwitch(fromModel, toModel) {
     const el = document.createElement('div');
     el.className = 'model-switch';
-    el.textContent = `Model: ${fromModel || 'brak'} → ${toModel || '?'}`;
+    el.textContent = `Model: ${fromModel || 'brak'} \u2192 ${toModel || '?'}`;
+    chatMessages.appendChild(el);
+    scrollToBottom();
+}
+
+function appendProviderInfo(providerName, model) {
+    const el = document.createElement('div');
+    el.className = 'model-switch';
+    el.innerHTML = `<span class="provider-badge cloud">${escapeHtml(providerName)}</span> ${model ? escapeHtml(model) : ''}`;
     chatMessages.appendChild(el);
     scrollToBottom();
 }
@@ -721,6 +734,135 @@ function removeAttachment() {
     $('attached-file-name').textContent = '';
 }
 
+// ──── Providers ────
+
+async function loadProviders() {
+    try {
+        const resp = await fetch('/api/providers');
+        const data = await resp.json();
+
+        const select = $('provider-select');
+        select.innerHTML = '';
+        for (const p of data.providers) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            if (p.id === data.active_provider) opt.selected = true;
+            select.appendChild(opt);
+        }
+
+        updateProviderUI(data);
+    } catch (e) {
+        console.error('Failed to load providers:', e);
+    }
+}
+
+function updateProviderUI(data) {
+    const selectedId = $('provider-select').value;
+    const provider = data.providers.find(p => p.id === selectedId);
+    if (!provider) return;
+
+    // Show/hide API key row
+    const keyRow = $('provider-key-row');
+    const modelRow = $('provider-model-row');
+    const keyStatus = $('provider-key-status');
+
+    if (provider.requires_api_key) {
+        keyRow.classList.remove('hidden');
+        if (provider.has_api_key) {
+            keyStatus.textContent = 'Klucz zapisany';
+            keyStatus.className = 'provider-key-status ok';
+        } else {
+            keyStatus.textContent = 'Brak klucza API';
+            keyStatus.className = 'provider-key-status missing';
+        }
+    } else {
+        keyRow.classList.add('hidden');
+    }
+
+    // Show model selector for non-local providers
+    if (selectedId !== 'local' && provider.models && provider.models.length > 0) {
+        modelRow.classList.remove('hidden');
+        const modelSel = $('provider-model-select');
+        modelSel.innerHTML = '';
+        for (const m of provider.models) {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.name + (m.context ? ` (${m.context})` : '');
+            if (m.id === provider.active_model) opt.selected = true;
+            modelSel.appendChild(opt);
+        }
+    } else {
+        modelRow.classList.add('hidden');
+    }
+
+    // Show active provider status
+    const statusDiv = $('provider-status');
+    if (data.active_provider === selectedId) {
+        statusDiv.textContent = 'Aktywny';
+        statusDiv.className = 'provider-status active';
+    } else {
+        statusDiv.textContent = '';
+        statusDiv.className = 'provider-status';
+    }
+}
+
+async function activateProvider() {
+    const providerId = $('provider-select').value;
+    const model = $('provider-model-select')?.value || null;
+
+    const statusDiv = $('provider-status');
+    statusDiv.textContent = 'Aktywuje...';
+    statusDiv.className = 'provider-status';
+
+    try {
+        const resp = await fetch('/api/providers/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider_id: providerId, model }),
+        });
+        if (resp.ok) {
+            statusDiv.textContent = 'Aktywny';
+            statusDiv.className = 'provider-status active';
+            await loadProviders();
+        } else {
+            const err = await resp.json();
+            statusDiv.textContent = err.detail || 'Blad aktywacji';
+            statusDiv.className = 'provider-status error';
+        }
+    } catch (e) {
+        statusDiv.textContent = 'Blad polaczenia';
+        statusDiv.className = 'provider-status error';
+    }
+}
+
+async function saveProviderKey() {
+    const providerId = $('provider-select').value;
+    const apiKey = $('provider-api-key').value.trim();
+    if (!apiKey) return;
+
+    const keyStatus = $('provider-key-status');
+    try {
+        const resp = await fetch('/api/providers/key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider_id: providerId, api_key: apiKey }),
+        });
+        if (resp.ok) {
+            keyStatus.textContent = 'Klucz zapisany';
+            keyStatus.className = 'provider-key-status ok';
+            $('provider-api-key').value = '';
+            await loadProviders();
+        } else {
+            keyStatus.textContent = 'Blad zapisu';
+            keyStatus.className = 'provider-key-status missing';
+        }
+    } catch (e) {
+        keyStatus.textContent = 'Blad polaczenia';
+        keyStatus.className = 'provider-key-status missing';
+    }
+}
+
 // ──── Semantic Router ────
 
 async function loadRouterConfig() {
@@ -892,6 +1034,18 @@ function setupEventListeners() {
             uploadFileForChat(e.target.files[0]);
             e.target.value = '';
         }
+    });
+
+    // Provider controls
+    $('provider-select').addEventListener('change', async () => {
+        const resp = await fetch('/api/providers');
+        const data = await resp.json();
+        updateProviderUI(data);
+    });
+    $('btn-activate-provider').addEventListener('click', activateProvider);
+    $('btn-save-key').addEventListener('click', saveProviderKey);
+    $('provider-api-key').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveProviderKey();
     });
 
     // Router controls

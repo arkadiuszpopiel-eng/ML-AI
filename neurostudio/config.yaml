@@ -22,6 +22,22 @@ models:
   # Default model to load on startup (filename or null for manual selection)
   default: null
 
+providers:
+  # Active provider: local, openai, anthropic, google, ollama, openrouter
+  active: "local"
+  # Provider-specific configuration (add api_key to enable)
+  local: {}
+  openai:
+    # api_key: "sk-..."
+  anthropic:
+    # api_key: "sk-ant-..."
+  google:
+    # api_key: "AIza..."
+  ollama:
+    api_base: "http://localhost:11434"
+  openrouter:
+    # api_key: "sk-or-..."
+
 router:
   # Enable automatic model routing based on task type
   enabled: true

@@ -501,6 +501,76 @@ label small {
     font-family: monospace;
 }
 
+/* ──── Provider Panel ──── */
+
+.provider-model-row {
+    margin-top: 6px;
+}
+
+.provider-key-row {
+    margin-top: 8px;
+}
+
+.provider-key-input-row {
+    display: flex;
+    gap: 6px;
+}
+
+.provider-key-input-row .input-sm {
+    flex: 1;
+}
+
+.provider-key-input-row .btn {
+    flex-shrink: 0;
+}
+
+.provider-key-status {
+    font-size: 0.78em;
+    margin-top: 4px;
+    min-height: 16px;
+}
+
+.provider-key-status.ok {
+    color: var(--success);
+}
+
+.provider-key-status.missing {
+    color: var(--warning);
+}
+
+.provider-status {
+    font-size: 0.78em;
+    margin-top: 6px;
+    text-align: center;
+    min-height: 16px;
+}
+
+.provider-status.active {
+    color: var(--success);
+}
+
+.provider-status.error {
+    color: var(--danger);
+}
+
+.provider-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.72em;
+    font-weight: 600;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.provider-badge.cloud {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 /* ──── Semantic Router ──── */
 
 .router-toggle-row {

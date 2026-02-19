@@ -225,14 +225,14 @@ ML-AI/
 - [x] **API:** GET/POST /api/router + POST /api/router/test (klasyfikacja z wizualizacją)
 - [x] **Testy:** 24 testy jednostkowe (SemanticScorer, detect, config, fallback)
 
-### v0.3 - RAG + Quality (GOTOWE - aktualny stan)
+### v0.3 - RAG + Quality (GOTOWE)
 > Baza wiedzy z dokumentów + testy + bezpieczeństwo + Docker.
 
 - [x] Silnik TF-IDF RAG - chunking z overlap, indeksowanie, search
 - [x] Upload i indeksowanie dokumentów przez UI
 - [x] Automatyczne wstrzykiwanie kontekstu RAG do promptów agenta
 - [x] API: upload, index-text, search, delete dokumentów
-- [x] **Testy jednostkowe (pytest)** - 84 testów w 7 modułach
+- [x] **Testy jednostkowe (pytest)** - 120 testów w 8 modułach
 - [x] **Docker Compose** - Dockerfile + docker-compose.yml z named volumes
 - [x] **Bezpieczeństwo:** fix XSS, path traversal, command injection, onclick injection
 - [x] **Temperature** podłączony: UI slider -> WebSocket -> agent -> inference
@@ -240,19 +240,24 @@ ML-AI/
 - [x] **Logging** zamiast cichego połykania błędów w monitorze GPU
 - [x] **.gitignore** + pyproject.toml + zunifikowane start.bat/start.sh
 
-### v0.4 - External AI APIs (DO ZROBIENIA)
+### v0.4 - External AI APIs (GOTOWE - aktualny stan)
 > Podpięcie zewnętrznych providerów AI obok lokalnego llama.cpp.
 
-- [ ] **Abstrakcja providerów** - wspólny interfejs dla lokalnych i chmurowych modeli
-- [ ] **OpenAI API** - GPT-4o, GPT-4o-mini (klucz API w config)
-- [ ] **Anthropic API** - Claude Sonnet, Claude Haiku
-- [ ] **Google Gemini API** - Gemini Pro, Gemini Flash
-- [ ] **Ollama** - integracja z lokalnym Ollama jako alternatywa dla llama.cpp
-- [ ] **OpenRouter** - jeden klucz API → dostęp do 100+ modeli
-- [ ] **UI: panel providerów** - dodawanie kluczy, wybór providera, fallback chain
-- [ ] **Routing po providerze** - np. kodowanie → lokalne Qwen, kreatywne → Claude
-- [ ] **Bufor kosztów** - tracking zużycia tokenów / kosztów dla API chmurowych
-- [ ] **Tryb hybrydowy** - lokalne dla prostych, chmurowe dla trudnych zadań
+- [x] **Abstrakcja providerów** - BaseProvider ABC + ProviderRegistry (wspólny interfejs)
+- [x] **LocalProvider** - wrapper na istniejący llama.cpp engine
+- [x] **OpenAI API** - GPT-4o, GPT-4o-mini, GPT-4.1, o3-mini (gotowe po dodaniu klucza)
+- [x] **Anthropic API** - Claude Sonnet 4.5, Haiku 4.5, Opus 4.6 (z translacją formatów)
+- [x] **Google Gemini API** - Gemini 2.5 Flash/Pro, 2.0 Flash (z translacją formatów)
+- [x] **Ollama** - integracja z lokalnym Ollama (OpenAI-compatible endpoint)
+- [x] **OpenRouter** - jeden klucz API → 8+ prekonfigurowanych modeli
+- [x] **UI: panel providerów** - wybór providera, model selector, dodawanie kluczy API
+- [x] **Agent loop integration** - cloud provider lub local engine, transparentnie
+- [x] **API:** GET /api/providers, POST activate/key, DELETE key
+- [x] **Config:** sekcja providers w config.yaml z persystencją kluczy
+- [x] **Testy:** 36 testów jednostkowych (registry, all providers, format conversion)
+- [ ] **TODO (v0.4.1):** Routing po providerze (coding→Qwen, creative→Claude)
+- [ ] **TODO (v0.4.1):** Bufor kosztów - tracking tokenów / kosztów
+- [ ] **TODO (v0.4.1):** Tryb hybrydowy - lokalne dla prostych, chmurowe dla trudnych
 
 ### v0.5 - Multi-Agent (DO ZROBIENIA)
 > Kilka agentów AI współpracuje nad złożonym zadaniem.

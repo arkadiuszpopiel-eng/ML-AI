@@ -3,7 +3,7 @@ Agent Loop - the core reasoning loop that connects the LLM with tools.
 
 Flow:
 1. User sends message
-2. Message + tool definitions sent to LLM
+2. Message + tool definitions sent to LLM (via active provider or local engine)
 3. LLM responds with text and/or tool calls
 4. If tool calls: execute tools, send results back to LLM, goto 3
 5. If final text: send to user
@@ -15,6 +15,7 @@ from typing import AsyncIterator, Any
 from ..config import load_config
 from ..inference.engine import engine
 from ..inference.router import select_model
+from ..inference.providers import provider_registry
 from ..tools.base import registry
 
 # Import tools to trigger registration
@@ -53,6 +54,13 @@ class AgentLoop:
         """Clear a conversation history."""
         self.conversations.pop(session_id, None)
 
+    def _get_active_provider(self):
+        """Get the active provider, or None if only local engine is available."""
+        provider = provider_registry.active_provider
+        if provider and provider.provider_id != "local":
+            return provider
+        return None
+
     async def process_message(self, session_id: str, user_message: str, temperature: float = 0.7) -> AsyncIterator[dict]:
         """
         Process a user message through the agent loop.
@@ -61,6 +69,7 @@ class AgentLoop:
           - {"type": "tool_call", "tool": "...", "args": {...}} -- tool being called
           - {"type": "tool_result", "tool": "...", "result": {...}} -- tool result
           - {"type": "model_switch", "from": "...", "to": "..."} -- model was switched
+          - {"type": "provider_info", "provider": "...", "model": "..."} -- active provider
           - {"type": "error", "message": "..."}       -- error
           - {"type": "done"}                           -- conversation turn complete
         """
@@ -68,19 +77,34 @@ class AgentLoop:
         agent_config = config.get("agent", {})
         max_tool_calls = agent_config.get("max_tool_calls", 10)
 
-        # Check if router suggests a different model
-        suggested_model = select_model(user_message)
-        if suggested_model and suggested_model != engine.current_model:
-            old_model = engine.current_model
-            yield {"type": "model_switch", "from": old_model, "to": suggested_model}
-            success = await engine.start(suggested_model)
-            if not success:
-                yield {"type": "error", "message": f"Failed to switch to model: {suggested_model}"}
-                return
+        # Determine inference source: cloud provider or local engine
+        cloud_provider = self._get_active_provider()
 
-        if not engine.is_running:
-            yield {"type": "error", "message": "No model is loaded. Please load a model first."}
-            return
+        if cloud_provider:
+            # Using cloud/external provider
+            if cloud_provider.is_available:
+                yield {
+                    "type": "provider_info",
+                    "provider": cloud_provider.provider_name,
+                    "model": cloud_provider.active_model,
+                }
+            else:
+                yield {"type": "error", "message": f"Provider {cloud_provider.provider_name} niedostepny (brak klucza API?)"}
+                return
+        else:
+            # Using local engine - apply router for model switching
+            suggested_model = select_model(user_message)
+            if suggested_model and suggested_model != engine.current_model:
+                old_model = engine.current_model
+                yield {"type": "model_switch", "from": old_model, "to": suggested_model}
+                success = await engine.start(suggested_model)
+                if not success:
+                    yield {"type": "error", "message": f"Failed to switch to model: {suggested_model}"}
+                    return
+
+            if not engine.is_running:
+                yield {"type": "error", "message": "Brak zaladowanego modelu. Zaladuj model lub podlacz provider API."}
+                return
 
         conversation = self.get_or_create_conversation(session_id)
 
@@ -100,13 +124,21 @@ class AgentLoop:
 
         while tool_call_count < max_tool_calls:
             try:
-                # Get LLM response (non-streaming for tool call detection)
-                response = await engine.chat_completion(
-                    messages=conversation,
-                    tools=tools_schema if tools_schema else None,
-                    temperature=temperature,
-                    stream=False,
-                )
+                if cloud_provider:
+                    # Use external provider
+                    response = await cloud_provider.chat_completion(
+                        messages=conversation,
+                        tools=tools_schema if tools_schema else None,
+                        temperature=temperature,
+                    )
+                else:
+                    # Use local llama.cpp engine
+                    response = await engine.chat_completion(
+                        messages=conversation,
+                        tools=tools_schema if tools_schema else None,
+                        temperature=temperature,
+                        stream=False,
+                    )
             except Exception as e:
                 logger.error("Inference error: %s", e)
                 yield {"type": "error", "message": f"Inference error: {str(e)}"}

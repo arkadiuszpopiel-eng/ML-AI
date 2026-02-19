@@ -32,6 +32,30 @@
                 </div>
             </div>
 
+            <!-- AI Provider -->
+            <div class="sidebar-section collapsible">
+                <h3 class="section-toggle" data-target="provider-panel">Provider AI <span class="toggle-arrow">&#9660;</span></h3>
+                <div id="provider-panel" class="section-content">
+                    <select id="provider-select" class="select-full">
+                        <option value="local">Lokalny (llama.cpp)</option>
+                    </select>
+                    <div id="provider-model-row" class="provider-model-row hidden">
+                        <select id="provider-model-select" class="select-full" style="margin-top:6px">
+                            <option value="">-- Wybierz model --</option>
+                        </select>
+                    </div>
+                    <div id="provider-key-row" class="provider-key-row hidden">
+                        <div class="provider-key-input-row">
+                            <input type="password" id="provider-api-key" class="input-sm" placeholder="Klucz API...">
+                            <button id="btn-save-key" class="btn btn-sm btn-success">OK</button>
+                        </div>
+                        <div id="provider-key-status" class="provider-key-status"></div>
+                    </div>
+                    <button id="btn-activate-provider" class="btn btn-sm btn-primary" style="width:100%;margin-top:8px">Aktywuj</button>
+                    <div id="provider-status" class="provider-status"></div>
+                </div>
+            </div>
+
             <!-- Model Selection -->
             <div class="sidebar-section">
                 <h3>Model</h3>

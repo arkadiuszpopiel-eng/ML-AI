@@ -45,7 +45,11 @@ class InferenceEngine:
 
         server_path = get_llama_server_path()
         if not server_path:
-            logger.error("llama-server binary not found. Run install.py first.")
+            logger.error(
+                "llama-server nie znaleziony. Uruchom install.py aby zainstalowac "
+                "llama.cpp, lub uzyj providera API (OpenAI, Anthropic, Ollama itp.) "
+                "w panelu Provider AI."
+            )
             return False
 
         config = load_config()

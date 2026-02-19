@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
     await engine.stop()
 
 
-app = FastAPI(title="NeuroForge", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="NeuroForge", version="0.4.0", lifespan=lifespan)
 
 # Mount static files
 app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
@@ -89,10 +89,30 @@ class ModelLoadRequest(BaseModel):
 
 @app.post("/api/models/load")
 async def api_load_model(req: ModelLoadRequest):
-    """Load a model into the inference engine."""
+    """Load a local GGUF model into the llama.cpp inference engine.
+    Automatically switches active provider to 'local' since loading a GGUF
+    model only makes sense with the local engine.
+    """
     model_path = get_model_path(req.filename)
     if not model_path:
         raise HTTPException(404, f"Model not found: {req.filename}")
+
+    # Check if llama-server binary exists before trying to start
+    from .config import get_llama_server_path
+    if not get_llama_server_path():
+        raise HTTPException(
+            503,
+            "llama-server nie znaleziony. Uruchom install.py lub uzyj providera API (OpenAI, Ollama itp.)"
+        )
+
+    # Auto-switch to local provider when loading a local model
+    if provider_registry._active_provider_id != "local":
+        provider_registry.set_active("local")
+        config = load_config()
+        if "providers" not in config:
+            config["providers"] = {}
+        config["providers"]["active"] = "local"
+        save_config(config)
 
     success = await engine.start(
         model_path,
@@ -101,9 +121,9 @@ async def api_load_model(req: ModelLoadRequest):
         threads=req.threads,
     )
     if not success:
-        raise HTTPException(500, "Failed to start inference engine. Check logs.")
+        raise HTTPException(500, "Nie udalo sie uruchomic silnika. Sprawdz logi.")
 
-    return {"success": True, "model": req.filename}
+    return {"success": True, "model": req.filename, "provider": "local"}
 
 
 @app.post("/api/models/unload")

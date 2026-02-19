@@ -460,13 +460,16 @@ async function loadModel() {
         });
 
         if (resp.ok) {
+            const result = await resp.json();
             state.modelLoaded = true;
             setStatus('active', filename);
             btnUnloadModel.disabled = false;
+            // Load model auto-switches to local provider - refresh UI
+            await loadProviders();
         } else {
             const data = await resp.json();
             setStatus('error', 'Blad ladowania');
-            alert('Blad: ' + (data.detail || 'Unknown error'));
+            alert('Blad: ' + (data.detail || 'Nieznany blad'));
         }
     } catch (e) {
         setStatus('error', 'Blad polaczenia');
@@ -889,6 +892,15 @@ function updateProviderBar(data) {
         costEl.classList.remove('hidden');
     } else {
         costEl.classList.add('hidden');
+    }
+
+    // Update local model section - show hint when cloud provider is active
+    const loadBtn = $('btn-load-model');
+    const unloadBtn = $('btn-unload-model');
+    if (isCloud) {
+        loadBtn.title = 'Zaladowanie modelu GGUF przelacza na lokalny provider';
+    } else {
+        loadBtn.title = '';
     }
 }
 

@@ -29,9 +29,15 @@ desktop.ini
 neurostudio/models/*.gguf
 neurostudio/data/conversations/
 neurostudio/data/documents/
+neurostudio/data/uploads/
 neurostudio/data/index/
+neurostudio/data/rag_index.json
+neurostudio/data/templates.json
 neurostudio/llama-server*
 neurostudio/llama.cpp/
+
+# Pytest
+.pytest_cache/
 
 # Logs
 *.log

@@ -1,8 +1,8 @@
 # NeuroForge ML/AI - Handoff dla nowego AI
 
 ## TL;DR
-**NeuroForge Local AI Studio v0.2.0** - kompletna aplikacja do uruchamiania lokalnych LLM na GPU AMD RX 9070 XT.
-FastAPI backend + vanilla JS frontend + llama.cpp inference. **Kod jest GOTOWY i KOMPLETNY** - 36 plików, ~5700 linii.
+**NeuroForge Local AI Studio v0.3.0** - kompletna aplikacja do uruchamiania lokalnych LLM na GPU AMD RX 9070 XT.
+FastAPI backend + vanilla JS frontend + llama.cpp inference. **Kod jest GOTOWY i KOMPLETNY** - ~45 plików, ~6500 linii + 60 testów.
 
 ---
 
@@ -197,30 +197,80 @@ ML-AI/
 
 ---
 
-## Co ZROBIONO w v0.3.0
+## Mapa rozwoju (Roadmap)
 
-- [x] **Testy jednostkowe (pytest)** - 60 testów w 6 modułach (storage, tools, RAG, templates, monitor, config)
+### v0.1 - Fundament (GOTOWE)
+> Podstawowa aplikacja: chat z lokalnym LLM przez przeglądarkę.
+
+- [x] FastAPI backend z 20+ REST endpointami + 2 WebSockety
+- [x] Inference engine - zarządzanie procesem llama-server (start/stop/health)
+- [x] Model manager - 5 rekomendowanych modeli, pobieranie z HuggingFace
+- [x] Agent loop - pętla rozumowania z wywołaniami narzędzi
+- [x] 8 narzędzi: filesystem, code executor, web search, web fetch, shell, process monitor, RAG search
+- [x] 12 szablonów promptów PL (code review, testy, tłumaczenia, refaktoring...)
+- [x] Dark theme UI z fioletowym akcentem, responsive, WebSocket chat
+- [x] Historia konwersacji, zarządzanie modelami, ustawienia GPU
+- [x] Monitor systemowy (CPU/RAM/dysk/GPU) z auto-odświeżaniem
+- [x] Instalator: install.py + install.bat + run.py
+
+### v0.2 - Semantic Router (80% GOTOWE)
+> Inteligentne przełączanie modeli na podstawie typu zadania.
+
+- [x] Detekcja typu zadania (coding/analysis/creative/chat) wg słów kluczowych
+- [x] Router z config.yaml (przypisanie modelu do typu zadania)
+- [x] Automatyczne przełączanie modelu w agent loop
+- [ ] **TODO:** Panel UI do konfiguracji routera (włącz/wyłącz, przypisania modeli)
+- [ ] **TODO:** Włączenie routera domyślnie po dodaniu UI
+- [ ] **TODO:** Lepszy scoring (embedding-based zamiast regex)
+
+### v0.3 - RAG + Quality (GOTOWE - aktualny stan)
+> Baza wiedzy z dokumentów + testy + bezpieczeństwo + Docker.
+
+- [x] Silnik TF-IDF RAG - chunking z overlap, indeksowanie, search
+- [x] Upload i indeksowanie dokumentów przez UI
+- [x] Automatyczne wstrzykiwanie kontekstu RAG do promptów agenta
+- [x] API: upload, index-text, search, delete dokumentów
+- [x] **Testy jednostkowe (pytest)** - 60 testów w 6 modułach
 - [x] **Docker Compose** - Dockerfile + docker-compose.yml z named volumes
-- [x] **Bezpieczeństwo:**
-  - Naprawiona luka XSS w renderMarkdown (sanityzacja URL - tylko http/https)
-  - Naprawiony path traversal w filesystem.py (proper path boundary check + symlink protection)
-  - Naprawiony command injection w shell.py (normalizacja whitespace + tokenizacja)
-  - Usunięte inline onclick handlers (zamienione na addEventListener)
-- [x] **Parametr temperature** podłączony UI -> WebSocket -> agent loop -> inference engine
-- [x] **Atomic writes** w storage.py (temp file + rename zamiast bezpośredniego zapisu)
-- [x] **Logging** w monitor.py zamiast cichego połykania błędów
-- [x] **.gitignore** + katalogi models/ i data/
+- [x] **Bezpieczeństwo:** fix XSS, path traversal, command injection, onclick injection
+- [x] **Temperature** podłączony: UI slider -> WebSocket -> agent -> inference
+- [x] **Atomic writes** w storage (temp file + rename)
+- [x] **Logging** zamiast cichego połykania błędów w monitorze GPU
+- [x] **.gitignore** + pyproject.toml + zunifikowane start.bat/start.sh
 
-## Co MOŻNA robić dalej (pomysły na rozwój)
+### v0.4 - Multi-Agent (DO ZROBIENIA)
+> Kilka agentów AI współpracuje nad złożonym zadaniem.
 
-- [ ] Persistent RAG index (zamiast rebuild po restarcie)
-- [ ] Streaming response w HTTP endpoint (nie tylko WebSocket)
-- [ ] Więcej narzędzi (git, baza danych, API caller)
-- [ ] Eksport konwersacji (markdown, PDF)
-- [ ] Wielojęzyczne szablony (EN obok PL)
-- [ ] Plugin system dla narzędzi
-- [ ] Rate limiting i auth token
-- [ ] PWA manifest + service worker
+- [ ] Orkiestrator agentów - koordynacja zadań między agentami
+- [ ] Role agentów (planer, coder, reviewer, researcher)
+- [ ] Komunikacja między agentami (message passing)
+- [ ] UI: wizualizacja przepływu pracy agentów
+- [ ] Równoległe wykonywanie podzadań
+- [ ] Shared context / pamięć współdzielona między agentami
+
+### v0.5 - Vision (DO ZROBIENIA)
+> Analiza obrazów i screenshotów przez modele multimodalne.
+
+- [ ] Obsługa modeli multimodalnych (LLaVA, Qwen-VL)
+- [ ] Upload i analiza obrazów w chacie
+- [ ] Screenshot tool - przechwytywanie ekranu
+- [ ] OCR z obrazów (wyciąganie tekstu)
+- [ ] Generowanie opisów obrazów
+- [ ] UI: podgląd obrazów w konwersacji
+
+### v1.0 - Production Release (DO ZROBIENIA)
+> Dopracowany produkt gotowy do codziennego użytku.
+
+- [ ] **System pluginów** - dynamiczne ładowanie narzędzi z katalogu plugins/
+- [ ] **Profile użytkowników** - ustawienia, historia, preferencje per user
+- [ ] **Polished UI** - animacje, onboarding, lepszy UX
+- [ ] **i18n** - wielojęzyczne szablony i interfejs (PL + EN)
+- [ ] **Eksport konwersacji** - markdown, PDF, JSON
+- [ ] **Rate limiting + auth token** - bezpieczeństwo API
+- [ ] **PWA** - manifest + service worker (offline mode)
+- [ ] **Persistent RAG index** - zapis na dysk zamiast rebuild po restarcie
+- [ ] **Streaming HTTP** - SSE w REST endpoint (nie tylko WebSocket)
+- [ ] **Więcej narzędzi** - git, baza danych SQL, API caller, image gen
 
 ---
 

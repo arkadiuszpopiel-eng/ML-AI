@@ -111,7 +111,7 @@ DEFAULT_TEMPLATES = [
 
 
 def _ensure_dir():
-    (BASE_DIR / "data").mkdir(parents=True, exist_ok=True)
+    TEMPLATES_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _load_custom_templates() -> list[dict]:

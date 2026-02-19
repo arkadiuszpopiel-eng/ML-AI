@@ -3,6 +3,8 @@ Shell tool - execute system commands directly.
 """
 import asyncio
 import os
+import re
+import shlex
 import sys
 from typing import Any
 
@@ -42,11 +44,20 @@ class ShellTool(Tool):
         timeout = shell_config.get("timeout", 30)
         blocked = shell_config.get("blocked_commands", [])
 
-        # Safety check
-        cmd_lower = command.lower().strip()
+        # Safety check: normalize whitespace and use word-boundary matching
+        cmd_normalized = re.sub(r'\s+', ' ', command.lower().strip())
         for blocked_cmd in blocked:
-            if blocked_cmd.lower() in cmd_lower:
+            blocked_lower = blocked_cmd.lower().strip()
+            # Check both exact substring and as first command token
+            if blocked_lower in cmd_normalized:
                 return {"success": False, "error": f"Command blocked for safety: contains '{blocked_cmd}'"}
+            # Also check individual tokens to catch aliased/split commands
+            try:
+                tokens = shlex.split(cmd_normalized)
+                if any(blocked_lower in t for t in tokens):
+                    return {"success": False, "error": f"Command blocked for safety: contains '{blocked_cmd}'"}
+            except ValueError:
+                pass
 
         try:
             if sys.platform == "win32":

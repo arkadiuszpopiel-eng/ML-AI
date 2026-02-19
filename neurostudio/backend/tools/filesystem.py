@@ -10,21 +10,36 @@ from .base import Tool, registry
 from ..config import load_config
 
 
+def _is_path_under(child: str, parent: str) -> bool:
+    """Check if child path is under parent directory using proper path comparison."""
+    try:
+        child_resolved = Path(child).resolve()
+        parent_resolved = Path(parent).resolve()
+        return child_resolved == parent_resolved or parent_resolved in child_resolved.parents
+    except (OSError, ValueError):
+        return False
+
+
 def _check_path_allowed(path: str) -> str | None:
     """Check if a path is allowed by configuration. Returns error message or None."""
     config = load_config()
     fs_config = config.get("tools", {}).get("filesystem", {})
     blocked = fs_config.get("blocked_dirs", [])
-    abs_path = os.path.abspath(path)
+
+    # Resolve symlinks to prevent symlink-based bypass
+    try:
+        abs_path = str(Path(path).resolve())
+    except (OSError, ValueError):
+        return f"Access denied: invalid path."
 
     for blocked_dir in blocked:
-        if abs_path.startswith(os.path.abspath(blocked_dir)):
+        if _is_path_under(abs_path, blocked_dir):
             return f"Access denied: {blocked_dir} is a blocked directory."
 
     allowed = fs_config.get("allowed_dirs", [])
     if allowed:
         for allowed_dir in allowed:
-            if abs_path.startswith(os.path.abspath(allowed_dir)):
+            if _is_path_under(abs_path, allowed_dir):
                 return None
         return f"Access denied: path is outside allowed directories."
     return None

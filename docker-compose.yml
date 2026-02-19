@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  neurostudio:
+    build:
+      context: ./neurostudio
+      dockerfile: Dockerfile
+    container_name: neuroforge
+    ports:
+      - "7860:7860"
+    volumes:
+      # Persist models and data across container restarts
+      - neuroforge-models:/app/models
+      - neuroforge-data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+volumes:
+  neuroforge-models:
+  neuroforge-data:

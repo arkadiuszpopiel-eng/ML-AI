@@ -140,8 +140,9 @@ function sendMessage(text) {
     // Add user message to UI
     appendUserMessage(finalText);
 
-    // Send via WebSocket
-    state.ws.send(JSON.stringify({ type: 'message', content: finalText }));
+    // Send via WebSocket (include temperature from slider)
+    const temperature = parseFloat(tempSlider.value) || 0.7;
+    state.ws.send(JSON.stringify({ type: 'message', content: finalText, temperature }));
 
     // Clear input
     chatInput.value = '';
@@ -373,13 +374,18 @@ async function loadRecommendedModels() {
                 <div class="model-card-name">${escapeHtml(m.name)}</div>
                 <div class="model-card-desc">${escapeHtml(m.description)}</div>
                 <div class="model-card-meta">
-                    <span class="model-card-size">${m.size}</span>
+                    <span class="model-card-size">${escapeHtml(m.size)}</span>
                     ${m.downloaded
                         ? '<span class="downloaded">&#10003; Pobrany</span>'
-                        : `<button class="btn btn-sm btn-primary" onclick="downloadModel('${m.repo}', '${m.filename}', this)">Pobierz</button>`
+                        : '<button class="btn btn-sm btn-primary btn-download">Pobierz</button>'
                     }
                 </div>
             `;
+            if (!m.downloaded) {
+                card.querySelector('.btn-download').addEventListener('click', function() {
+                    downloadModel(m.repo, m.filename, this);
+                });
+            }
             container.appendChild(card);
         }
     } catch (e) {
@@ -643,8 +649,9 @@ async function loadDocumentsList() {
                     <span class="doc-name">${escapeHtml(doc.filename)}</span>
                     <span class="doc-meta">${sizeKb} KB, ${doc.chunk_count} fragmentow</span>
                 </div>
-                <button class="btn-doc-remove" onclick="removeDocument('${doc.doc_id}')" title="Usun">&times;</button>
+                <button class="btn-doc-remove" title="Usun">&times;</button>
             `;
+            el.querySelector('.btn-doc-remove').addEventListener('click', () => removeDocument(doc.doc_id));
             container.appendChild(el);
         }
     } catch (e) {
@@ -839,8 +846,13 @@ function renderMarkdown(text) {
     // Italic *...*
     html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-    // Links [text](url)
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // Links [text](url) - only allow http/https URLs to prevent javascript: XSS
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
+        if (/^https?:\/\//i.test(url)) {
+            return `<a href="${url}" target="_blank" rel="noopener">${text}</a>`;
+        }
+        return `${text} (${url})`;
+    });
 
     // Line breaks
     html = html.replace(/\n/g, '<br>');

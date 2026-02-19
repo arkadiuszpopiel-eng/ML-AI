@@ -53,7 +53,7 @@ class AgentLoop:
         """Clear a conversation history."""
         self.conversations.pop(session_id, None)
 
-    async def process_message(self, session_id: str, user_message: str) -> AsyncIterator[dict]:
+    async def process_message(self, session_id: str, user_message: str, temperature: float = 0.7) -> AsyncIterator[dict]:
         """
         Process a user message through the agent loop.
         Yields events as dicts:
@@ -104,6 +104,7 @@ class AgentLoop:
                 response = await engine.chat_completion(
                     messages=conversation,
                     tools=tools_schema if tools_schema else None,
+                    temperature=temperature,
                     stream=False,
                 )
             except Exception as e:

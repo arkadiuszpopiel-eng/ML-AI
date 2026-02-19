@@ -188,7 +188,13 @@ async def ws_chat(ws: WebSocket):
                 if not user_msg.strip():
                     continue
 
-                async for event in agent.process_message(session_id, user_msg):
+                temperature = data.get("temperature", 0.7)
+                try:
+                    temperature = max(0.0, min(2.0, float(temperature)))
+                except (TypeError, ValueError):
+                    temperature = 0.7
+
+                async for event in agent.process_message(session_id, user_msg, temperature=temperature):
                     await ws.send_json(event)
 
                 # Auto-save conversation after each exchange

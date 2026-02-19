@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# NeuroForge specific
+neurostudio/models/*.gguf
+neurostudio/data/conversations/
+neurostudio/data/documents/
+neurostudio/data/index/
+neurostudio/llama-server*
+neurostudio/llama.cpp/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

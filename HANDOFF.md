@@ -195,17 +195,29 @@ ML-AI/
 
 ---
 
+## Co ZROBIONO w v0.3.0
+
+- [x] **Testy jednostkowe (pytest)** - 60 testów w 6 modułach (storage, tools, RAG, templates, monitor, config)
+- [x] **Docker Compose** - Dockerfile + docker-compose.yml z named volumes
+- [x] **Bezpieczeństwo:**
+  - Naprawiona luka XSS w renderMarkdown (sanityzacja URL - tylko http/https)
+  - Naprawiony path traversal w filesystem.py (proper path boundary check + symlink protection)
+  - Naprawiony command injection w shell.py (normalizacja whitespace + tokenizacja)
+  - Usunięte inline onclick handlers (zamienione na addEventListener)
+- [x] **Parametr temperature** podłączony UI -> WebSocket -> agent loop -> inference engine
+- [x] **Atomic writes** w storage.py (temp file + rename zamiast bezpośredniego zapisu)
+- [x] **Logging** w monitor.py zamiast cichego połykania błędów
+- [x] **.gitignore** + katalogi models/ i data/
+
 ## Co MOŻNA robić dalej (pomysły na rozwój)
 
-- [ ] Testy jednostkowe (pytest)
-- [ ] Docker compose
 - [ ] Persistent RAG index (zamiast rebuild po restarcie)
 - [ ] Streaming response w HTTP endpoint (nie tylko WebSocket)
 - [ ] Więcej narzędzi (git, baza danych, API caller)
 - [ ] Eksport konwersacji (markdown, PDF)
 - [ ] Wielojęzyczne szablony (EN obok PL)
 - [ ] Plugin system dla narzędzi
-- [ ] Bezpieczeństwo: rate limiting, auth token
+- [ ] Rate limiting i auth token
 - [ ] PWA manifest + service worker
 
 ---

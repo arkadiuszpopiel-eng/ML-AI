@@ -87,8 +87,12 @@ def get_gpu_info_amd() -> Optional[dict]:
                 "vram_used_mb": gpu_data.get("VRAM Total Used Memory (B)", "N/A"),
                 "vram_total_mb": gpu_data.get("VRAM Total Memory (B)", "N/A"),
             }
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
-        pass
+    except subprocess.TimeoutExpired:
+        logger.warning("rocm-smi JSON query timed out")
+    except json.JSONDecodeError as e:
+        logger.warning("Failed to parse rocm-smi JSON output: %s", e)
+    except FileNotFoundError:
+        logger.debug("rocm-smi binary not found at expected path")
 
     # Fallback: plain text parsing
     try:
@@ -97,8 +101,10 @@ def get_gpu_info_amd() -> Optional[dict]:
         )
         if result.returncode == 0:
             return {"vendor": "AMD", "raw": result.stdout[:500]}
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+    except subprocess.TimeoutExpired:
+        logger.warning("rocm-smi plain-text query timed out")
+    except FileNotFoundError:
+        logger.debug("rocm-smi binary disappeared during fallback query")
 
     return None
 
@@ -126,8 +132,12 @@ def get_gpu_info_nvidia() -> Optional[dict]:
                     "vram_used_mb": int(parts[3].strip()),
                     "vram_total_mb": int(parts[4].strip()),
                 }
-    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
-        pass
+    except subprocess.TimeoutExpired:
+        logger.warning("nvidia-smi query timed out")
+    except FileNotFoundError:
+        logger.debug("nvidia-smi binary not found")
+    except ValueError as e:
+        logger.warning("Failed to parse nvidia-smi output: %s", e)
 
     return None
 

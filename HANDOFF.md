@@ -238,20 +238,35 @@ ML-AI/
 - [x] **Logging** zamiast cichego połykania błędów w monitorze GPU
 - [x] **.gitignore** + pyproject.toml + zunifikowane start.bat/start.sh
 
-### v0.4 - Multi-Agent (DO ZROBIENIA)
+### v0.4 - External AI APIs (DO ZROBIENIA)
+> Podpięcie zewnętrznych providerów AI obok lokalnego llama.cpp.
+
+- [ ] **Abstrakcja providerów** - wspólny interfejs dla lokalnych i chmurowych modeli
+- [ ] **OpenAI API** - GPT-4o, GPT-4o-mini (klucz API w config)
+- [ ] **Anthropic API** - Claude Sonnet, Claude Haiku
+- [ ] **Google Gemini API** - Gemini Pro, Gemini Flash
+- [ ] **Ollama** - integracja z lokalnym Ollama jako alternatywa dla llama.cpp
+- [ ] **OpenRouter** - jeden klucz API → dostęp do 100+ modeli
+- [ ] **UI: panel providerów** - dodawanie kluczy, wybór providera, fallback chain
+- [ ] **Routing po providerze** - np. kodowanie → lokalne Qwen, kreatywne → Claude
+- [ ] **Bufor kosztów** - tracking zużycia tokenów / kosztów dla API chmurowych
+- [ ] **Tryb hybrydowy** - lokalne dla prostych, chmurowe dla trudnych zadań
+
+### v0.5 - Multi-Agent (DO ZROBIENIA)
 > Kilka agentów AI współpracuje nad złożonym zadaniem.
 
 - [ ] Orkiestrator agentów - koordynacja zadań między agentami
 - [ ] Role agentów (planer, coder, reviewer, researcher)
 - [ ] Komunikacja między agentami (message passing)
+- [ ] Każdy agent może używać innego modelu/providera (lokalne + chmurowe)
 - [ ] UI: wizualizacja przepływu pracy agentów
 - [ ] Równoległe wykonywanie podzadań
 - [ ] Shared context / pamięć współdzielona między agentami
 
-### v0.5 - Vision (DO ZROBIENIA)
+### v0.6 - Vision (DO ZROBIENIA)
 > Analiza obrazów i screenshotów przez modele multimodalne.
 
-- [ ] Obsługa modeli multimodalnych (LLaVA, Qwen-VL)
+- [ ] Obsługa modeli multimodalnych (LLaVA, Qwen-VL, GPT-4o vision)
 - [ ] Upload i analiza obrazów w chacie
 - [ ] Screenshot tool - przechwytywanie ekranu
 - [ ] OCR z obrazów (wyciąganie tekstu)

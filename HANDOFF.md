@@ -36,9 +36,11 @@ ML-AI/
 └── neurostudio/                       # Główna aplikacja NeuroForge
     ├── config.yaml                    # Konfiguracja serwera/modeli/narzędzi
     ├── requirements.txt               # 11 zależności Python
-    ├── install.py                     # Autoinstalator (Linux/macOS/Windows)
-    ├── install.bat                    # One-click installer Windows
-    ├── run.py                         # Launcher aplikacji
+    ├── start.bat                      # All-in-one: install + run (Windows)
+    ├── start.sh                       # All-in-one: install + run (Linux/macOS)
+    ├── install.py                     # Autoinstalator (używany przez start.*)
+    ├── install.bat                    # Stary installer (zachowany dla kompatybilności)
+    ├── run.py                         # Launcher serwera (używany przez start.*)
     ├── models/                        # Tu trafiają pliki .gguf
     ├── data/                          # Konwersacje, dokumenty, indeks RAG
     ├── backend/
@@ -224,19 +226,28 @@ ML-AI/
 
 ## Uruchomienie
 
+**Jeden plik robi wszystko** (instalacja + uruchomienie):
+
 ### Windows
 ```cmd
 cd neurostudio
-install.bat
-NeuroForge.bat
+start.bat
 ```
 
 ### Linux/macOS
 ```bash
 cd neurostudio
-python install.py
-python run.py
+chmod +x start.sh
+./start.sh
 ```
+
+Skrypty automatycznie:
+1. Sprawdzają Pythona
+2. Tworzą venv (jeśli brak)
+3. Instalują/aktualizują zależności (skip jeśli requirements.txt się nie zmienił)
+4. Pobierają llama.cpp (jeśli brak)
+5. Tworzą katalogi danych
+6. Uruchamiają serwer
 
 Aplikacja startuje na `http://localhost:7860`
 

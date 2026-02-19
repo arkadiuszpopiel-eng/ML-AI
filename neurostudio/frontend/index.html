@@ -32,27 +32,35 @@
                 </div>
             </div>
 
-            <!-- AI Provider -->
+            <!-- ═══════ Provider AI (przebudowany) ═══════ -->
             <div class="sidebar-section collapsible">
                 <h3 class="section-toggle" data-target="provider-panel">Provider AI <span class="toggle-arrow">&#9660;</span></h3>
                 <div id="provider-panel" class="section-content">
-                    <select id="provider-select" class="select-full">
-                        <option value="local">Lokalny (llama.cpp)</option>
-                    </select>
-                    <div id="provider-model-row" class="provider-model-row hidden">
-                        <select id="provider-model-select" class="select-full" style="margin-top:6px">
-                            <option value="">-- Wybierz model --</option>
-                        </select>
-                    </div>
-                    <div id="provider-key-row" class="provider-key-row hidden">
-                        <div class="provider-key-input-row">
-                            <input type="password" id="provider-api-key" class="input-sm" placeholder="Klucz API...">
-                            <button id="btn-save-key" class="btn btn-sm btn-success">OK</button>
+
+                    <!-- Aktywny provider info -->
+                    <div id="active-provider-card" class="active-provider-card">
+                        <div class="apc-header">
+                            <span id="apc-indicator" class="provider-bar-indicator local"></span>
+                            <span id="apc-name">Lokalny (llama.cpp)</span>
                         </div>
-                        <div id="provider-key-status" class="provider-key-status"></div>
+                        <div id="apc-model" class="apc-model"></div>
+                        <button id="btn-deactivate-provider" class="btn btn-xs btn-danger" style="margin-top:4px" disabled>Dezaktywuj</button>
                     </div>
-                    <button id="btn-activate-provider" class="btn btn-sm btn-primary" style="width:100%;margin-top:8px">Aktywuj</button>
-                    <div id="provider-status" class="provider-status"></div>
+
+                    <!-- Przelaczanie providera -->
+                    <div class="provider-switch-row">
+                        <select id="provider-select" class="select-full">
+                            <option value="local">Lokalny (llama.cpp)</option>
+                        </select>
+                        <div id="provider-model-row" class="provider-model-row hidden">
+                            <select id="provider-model-select" class="select-full" style="margin-top:6px">
+                                <option value="">-- Wybierz model --</option>
+                            </select>
+                        </div>
+                        <button id="btn-activate-provider" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">Aktywuj</button>
+                    </div>
+
+                    <!-- Grid skonfigurowanych kluczy -->
                     <div id="provider-keys-list" class="provider-keys-list" style="margin-top:10px">
                         <small style="color:var(--text-secondary)">Skonfigurowane API:</small>
                         <div id="provider-keys-grid" class="provider-keys-grid"></div>
@@ -60,9 +68,17 @@
                 </div>
             </div>
 
+            <!-- ═══════ Klucze API (NOWA ZAKLADKA) ═══════ -->
+            <div class="sidebar-section collapsible">
+                <h3 class="section-toggle" data-target="api-keys-panel">Klucze API <span class="toggle-arrow">&#9660;</span></h3>
+                <div id="api-keys-panel" class="section-content">
+                    <div id="api-keys-forms" class="api-keys-forms"></div>
+                </div>
+            </div>
+
             <!-- Model Selection -->
             <div class="sidebar-section">
-                <h3>Model</h3>
+                <h3>Model lokalny</h3>
                 <select id="model-select" class="select-full">
                     <option value="">-- Wybierz model --</option>
                 </select>
@@ -98,10 +114,17 @@
                 </div>
             </div>
 
-            <!-- Model Download -->
+            <!-- Model Download (przebudowany z kategoriami) -->
             <div class="sidebar-section collapsible">
                 <h3 class="section-toggle" data-target="model-download">Pobierz modele <span class="toggle-arrow">&#9660;</span></h3>
                 <div id="model-download" class="section-content">
+                    <div id="download-categories" class="download-categories">
+                        <button class="dl-cat active" data-cat="all">Wszystkie</button>
+                        <button class="dl-cat" data-cat="coding">Kodowanie</button>
+                        <button class="dl-cat" data-cat="general">Ogolne</button>
+                        <button class="dl-cat" data-cat="creative">Kreatywne</button>
+                        <button class="dl-cat" data-cat="lightweight">Lekkie</button>
+                    </div>
                     <div id="recommended-models"></div>
                 </div>
             </div>
@@ -288,7 +311,7 @@
                             <span>RAG</span>
                         </div>
                     </div>
-                    <p class="hint">Zaladuj model z bocznego panelu, zeby zaczac.</p>
+                    <p class="hint">Zaladuj model lub podlacz API, zeby zaczac.</p>
                 </div>
             </div>
 

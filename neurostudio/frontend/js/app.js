@@ -378,63 +378,163 @@ async function loadModels() {
     }
 }
 
+let _recommendedModelsData = [];
+let _currentDlCategory = 'all';
+
 async function loadRecommendedModels() {
     try {
         const resp = await fetch('/api/models/recommended');
         const data = await resp.json();
-        const container = $('recommended-models');
-        container.innerHTML = '';
-
-        for (const m of data.models) {
-            const card = document.createElement('div');
-            card.className = 'model-card';
-            card.innerHTML = `
-                <div class="model-card-name">${escapeHtml(m.name)}</div>
-                <div class="model-card-desc">${escapeHtml(m.description)}</div>
-                <div class="model-card-meta">
-                    <span class="model-card-size">${escapeHtml(m.size)}</span>
-                    ${m.downloaded
-                        ? '<span class="downloaded">&#10003; Pobrany</span>'
-                        : '<button class="btn btn-sm btn-primary btn-download">Pobierz</button>'
-                    }
-                </div>
-            `;
-            if (!m.downloaded) {
-                card.querySelector('.btn-download').addEventListener('click', function() {
-                    downloadModel(m.repo, m.filename, this);
-                });
-            }
-            container.appendChild(card);
-        }
+        _recommendedModelsData = data.models || [];
+        renderRecommendedModels();
     } catch (e) {
         console.error('Failed to load recommended models:', e);
     }
 }
 
-async function downloadModel(repo, filename, btn) {
+function renderRecommendedModels() {
+    const container = $('recommended-models');
+    container.innerHTML = '';
+    const cat = _currentDlCategory;
+
+    const CATEGORY_LABELS = {
+        coding: 'Kodowanie',
+        general: 'Ogolne',
+        creative: 'Kreatywne',
+        powerhouse: 'Potezne',
+        lightweight: 'Lekkie',
+    };
+
+    const filtered = cat === 'all'
+        ? _recommendedModelsData
+        : _recommendedModelsData.filter(m => m.category === cat);
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85em;text-align:center">Brak modeli w tej kategorii</p>';
+        return;
+    }
+
+    for (const m of filtered) {
+        const card = document.createElement('div');
+        card.className = 'model-card';
+
+        const catLabel = CATEGORY_LABELS[m.category] || m.category;
+        const caps = (m.capabilities || []).map(c => `<span class="cap-tag">${escapeHtml(c)}</span>`).join('');
+
+        card.innerHTML = `
+            <div class="model-card-top">
+                <div class="model-card-name">${escapeHtml(m.name)}</div>
+                <span class="model-card-cat">${escapeHtml(catLabel)}</span>
+            </div>
+            <div class="model-card-desc">${escapeHtml(m.description)}</div>
+            <div class="model-card-caps">${caps}</div>
+            <div class="model-card-meta">
+                <span class="model-card-size">${escapeHtml(m.size)}</span>
+                ${m.downloaded
+                    ? '<span class="downloaded">&#10003; Pobrany</span>'
+                    : `<button class="btn btn-sm btn-primary btn-download" data-repo="${escapeHtml(m.repo)}" data-file="${escapeHtml(m.filename)}">Pobierz</button>`
+                }
+            </div>
+            <div class="download-progress hidden" id="dl-progress-${m.filename.replace(/[^a-zA-Z0-9]/g, '_')}">
+                <div class="dl-progress-bar"><div class="dl-progress-fill"></div></div>
+                <div class="dl-progress-info">
+                    <span class="dl-progress-pct">0%</span>
+                    <span class="dl-progress-speed"></span>
+                    <span class="dl-progress-eta"></span>
+                </div>
+            </div>
+        `;
+
+        const dlBtn = card.querySelector('.btn-download');
+        if (dlBtn) {
+            dlBtn.addEventListener('click', function() {
+                downloadModelWithProgress(m.repo, m.filename, this, card);
+            });
+        }
+        container.appendChild(card);
+    }
+}
+
+async function downloadModelWithProgress(repo, filename, btn, card) {
     btn.disabled = true;
     btn.textContent = 'Pobieranie...';
 
+    const safeId = filename.replace(/[^a-zA-Z0-9]/g, '_');
+    const progressEl = card.querySelector(`#dl-progress-${safeId}`);
+    if (progressEl) progressEl.classList.remove('hidden');
+
+    const startTime = Date.now();
+    let pollInterval = null;
+
     try {
-        const resp = await fetch('/api/models/download', {
+        // Start download
+        const respPromise = fetch('/api/models/download', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ repo, filename }),
         });
 
+        // Poll for progress
+        if (progressEl) {
+            const fill = progressEl.querySelector('.dl-progress-fill');
+            const pctEl = progressEl.querySelector('.dl-progress-pct');
+            const speedEl = progressEl.querySelector('.dl-progress-speed');
+            const etaEl = progressEl.querySelector('.dl-progress-eta');
+
+            let fakeProgress = 0;
+            pollInterval = setInterval(() => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                // Smooth fake progress (asymptotic approach to 95%)
+                fakeProgress = 95 * (1 - Math.exp(-elapsed / 60));
+                const pct = Math.round(fakeProgress);
+                fill.style.width = pct + '%';
+                pctEl.textContent = pct + '%';
+
+                if (elapsed > 5) {
+                    const mins = Math.floor(elapsed / 60);
+                    const secs = Math.floor(elapsed % 60);
+                    etaEl.textContent = `${mins}m ${secs}s`;
+                }
+            }, 500);
+        }
+
+        const resp = await respPromise;
+
+        if (pollInterval) clearInterval(pollInterval);
+
         if (resp.ok) {
+            if (progressEl) {
+                const fill = progressEl.querySelector('.dl-progress-fill');
+                const pctEl = progressEl.querySelector('.dl-progress-pct');
+                const etaEl = progressEl.querySelector('.dl-progress-eta');
+                fill.style.width = '100%';
+                pctEl.textContent = '100%';
+                const totalSec = Math.round((Date.now() - startTime) / 1000);
+                const mins = Math.floor(totalSec / 60);
+                const secs = totalSec % 60;
+                etaEl.textContent = `Gotowe w ${mins}m ${secs}s`;
+            }
             btn.textContent = 'Pobrano!';
             btn.className = 'downloaded';
+            btn.disabled = true;
             loadModels();
         } else {
             const data = await resp.json();
             btn.textContent = 'Blad!';
+            btn.disabled = false;
             alert('Blad pobierania: ' + (data.detail || 'unknown'));
         }
     } catch (e) {
+        if (pollInterval) clearInterval(pollInterval);
         btn.textContent = 'Blad!';
+        btn.disabled = false;
         alert('Blad pobierania: ' + e.message);
     }
+}
+
+// Legacy wrapper for backward compat
+async function downloadModel(repo, filename, btn) {
+    downloadModelWithProgress(repo, filename, btn, btn.closest('.model-card'));
 }
 
 async function loadModel() {
@@ -743,24 +843,28 @@ function removeAttachment() {
 
 // ──── Providers ────
 
+let _providersData = null;
+
 async function loadProviders() {
     try {
         const resp = await fetch('/api/providers');
-        const data = await resp.json();
+        _providersData = await resp.json();
 
         const select = $('provider-select');
         select.innerHTML = '';
-        for (const p of data.providers) {
+        for (const p of _providersData.providers) {
             const opt = document.createElement('option');
             opt.value = p.id;
             opt.textContent = p.name;
-            if (p.id === data.active_provider) opt.selected = true;
+            if (p.id === _providersData.active_provider) opt.selected = true;
             select.appendChild(opt);
         }
 
-        updateProviderUI(data);
-        renderProviderKeysGrid(data);
-        updateProviderBar(data);
+        updateProviderUI(_providersData);
+        updateActiveProviderCard(_providersData);
+        renderProviderKeysGrid(_providersData);
+        renderApiKeysForms(_providersData);
+        updateProviderBar(_providersData);
     } catch (e) {
         console.error('Failed to load providers:', e);
     }
@@ -771,23 +875,7 @@ function updateProviderUI(data) {
     const provider = data.providers.find(p => p.id === selectedId);
     if (!provider) return;
 
-    // Show/hide API key row
-    const keyRow = $('provider-key-row');
     const modelRow = $('provider-model-row');
-    const keyStatus = $('provider-key-status');
-
-    if (provider.requires_api_key) {
-        keyRow.classList.remove('hidden');
-        if (provider.has_api_key) {
-            keyStatus.textContent = 'Klucz zapisany';
-            keyStatus.className = 'provider-key-status ok';
-        } else {
-            keyStatus.textContent = 'Brak klucza API';
-            keyStatus.className = 'provider-key-status missing';
-        }
-    } else {
-        keyRow.classList.add('hidden');
-    }
 
     // Show model selector for non-local providers
     if (selectedId !== 'local' && provider.models && provider.models.length > 0) {
@@ -804,25 +892,25 @@ function updateProviderUI(data) {
     } else {
         modelRow.classList.add('hidden');
     }
+}
 
-    // Show active provider status
-    const statusDiv = $('provider-status');
-    if (data.active_provider === selectedId) {
-        statusDiv.textContent = 'Aktywny';
-        statusDiv.className = 'provider-status active';
-    } else {
-        statusDiv.textContent = '';
-        statusDiv.className = 'provider-status';
-    }
+function updateActiveProviderCard(data) {
+    const activeId = data.active_provider || 'local';
+    const provider = data.providers.find(p => p.id === activeId);
+    if (!provider) return;
+
+    const isCloud = activeId !== 'local';
+    $('apc-indicator').className = 'provider-bar-indicator ' + (isCloud ? 'cloud' : 'local');
+    $('apc-name').textContent = provider.name;
+    $('apc-model').textContent = provider.active_model || (isCloud ? '' : '(zaladuj model ponizej)');
+
+    const deactBtn = $('btn-deactivate-provider');
+    deactBtn.disabled = !isCloud;
 }
 
 async function activateProvider() {
     const providerId = $('provider-select').value;
     const model = $('provider-model-select')?.value || null;
-
-    const statusDiv = $('provider-status');
-    statusDiv.textContent = 'Aktywuje...';
-    statusDiv.className = 'provider-status';
 
     try {
         const resp = await fetch('/api/providers/activate', {
@@ -831,26 +919,103 @@ async function activateProvider() {
             body: JSON.stringify({ provider_id: providerId, model }),
         });
         if (resp.ok) {
-            statusDiv.textContent = 'Aktywny';
-            statusDiv.className = 'provider-status active';
             await loadProviders();
         } else {
             const err = await resp.json();
-            statusDiv.textContent = err.detail || 'Blad aktywacji';
-            statusDiv.className = 'provider-status error';
+            alert(err.detail || 'Blad aktywacji providera');
         }
     } catch (e) {
-        statusDiv.textContent = 'Blad polaczenia';
-        statusDiv.className = 'provider-status error';
+        alert('Blad polaczenia');
     }
 }
 
-async function saveProviderKey() {
-    const providerId = $('provider-select').value;
-    const apiKey = $('provider-api-key').value.trim();
-    if (!apiKey) return;
+async function deactivateProvider() {
+    // Switch back to local
+    try {
+        const resp = await fetch('/api/providers/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider_id: 'local' }),
+        });
+        if (resp.ok) {
+            await loadProviders();
+        }
+    } catch (e) {
+        alert('Blad polaczenia');
+    }
+}
 
-    const keyStatus = $('provider-key-status');
+// ──── API Keys Panel (dedykowana zakladka) ────
+
+function renderApiKeysForms(data) {
+    const container = $('api-keys-forms');
+    container.innerHTML = '';
+
+    const API_HINTS = {
+        openai: 'Klucz zaczyna sie od sk-...',
+        anthropic: 'Klucz zaczyna sie od sk-ant-...',
+        google: 'Klucz zaczyna sie od AIza...',
+        openrouter: 'Klucz zaczyna sie od sk-or-...',
+    };
+
+    for (const p of data.providers) {
+        if (!p.requires_api_key) continue;
+
+        const row = document.createElement('div');
+        row.className = 'api-key-form-row' + (p.has_api_key ? ' configured' : '');
+
+        row.innerHTML = `
+            <div class="akf-header">
+                <span class="akf-name">${escapeHtml(p.name)}</span>
+                ${p.has_api_key
+                    ? '<span class="akf-badge ok">Aktywny</span>'
+                    : '<span class="akf-badge missing">Brak klucza</span>'
+                }
+            </div>
+            <div class="akf-input-row">
+                <input type="password" class="input-sm akf-input" placeholder="${escapeHtml(API_HINTS[p.id] || 'Klucz API...')}" data-provider="${p.id}">
+                <button class="btn btn-sm btn-success akf-save" data-provider="${p.id}">Zapisz</button>
+                ${p.has_api_key ? `<button class="btn btn-sm btn-danger akf-delete" data-provider="${p.id}" title="Usun klucz">X</button>` : ''}
+            </div>
+        `;
+        container.appendChild(row);
+    }
+
+    // Bind events
+    container.querySelectorAll('.akf-save').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const pid = btn.dataset.provider;
+            const input = container.querySelector(`.akf-input[data-provider="${pid}"]`);
+            const key = input.value.trim();
+            if (!key) return;
+            await saveApiKey(pid, key);
+            input.value = '';
+        });
+    });
+
+    container.querySelectorAll('.akf-delete').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const pid = btn.dataset.provider;
+            if (confirm(`Usunac klucz API dla ${pid}?`)) {
+                await deleteApiKey(pid);
+            }
+        });
+    });
+
+    container.querySelectorAll('.akf-input').forEach(input => {
+        input.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const pid = input.dataset.provider;
+                const key = input.value.trim();
+                if (!key) return;
+                await saveApiKey(pid, key);
+                input.value = '';
+            }
+        });
+    });
+}
+
+async function saveApiKey(providerId, apiKey) {
     try {
         const resp = await fetch('/api/providers/key', {
             method: 'POST',
@@ -858,17 +1023,25 @@ async function saveProviderKey() {
             body: JSON.stringify({ provider_id: providerId, api_key: apiKey }),
         });
         if (resp.ok) {
-            keyStatus.textContent = 'Klucz zapisany';
-            keyStatus.className = 'provider-key-status ok';
-            $('provider-api-key').value = '';
             await loadProviders();
         } else {
-            keyStatus.textContent = 'Blad zapisu';
-            keyStatus.className = 'provider-key-status missing';
+            alert('Blad zapisu klucza');
         }
     } catch (e) {
-        keyStatus.textContent = 'Blad polaczenia';
-        keyStatus.className = 'provider-key-status missing';
+        alert('Blad polaczenia');
+    }
+}
+
+async function deleteApiKey(providerId) {
+    try {
+        const resp = await fetch(`/api/providers/key/${providerId}`, { method: 'DELETE' });
+        if (resp.ok) {
+            await loadProviders();
+        } else {
+            alert('Blad usuwania klucza');
+        }
+    } catch (e) {
+        alert('Blad polaczenia');
     }
 }
 
@@ -1177,15 +1350,20 @@ function setupEventListeners() {
     });
 
     // Provider controls
-    $('provider-select').addEventListener('change', async () => {
-        const resp = await fetch('/api/providers');
-        const data = await resp.json();
-        updateProviderUI(data);
+    $('provider-select').addEventListener('change', () => {
+        if (_providersData) updateProviderUI(_providersData);
     });
     $('btn-activate-provider').addEventListener('click', activateProvider);
-    $('btn-save-key').addEventListener('click', saveProviderKey);
-    $('provider-api-key').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') saveProviderKey();
+    $('btn-deactivate-provider').addEventListener('click', deactivateProvider);
+
+    // Download category filters
+    document.querySelectorAll('.dl-cat').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.dl-cat').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            _currentDlCategory = btn.dataset.cat;
+            renderRecommendedModels();
+        });
     });
 
     // Usage panel controls

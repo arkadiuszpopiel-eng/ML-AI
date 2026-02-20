@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadModels();
     loadRecommendedModels();
     loadStatus();
+    checkEngineSetup();
     loadConversationHistory();
     loadDocumentsList();
     loadTemplates();
@@ -544,6 +545,14 @@ async function loadModel() {
         return;
     }
 
+    // Check if engine is installed first
+    if (!_engineInstalled) {
+        const box = $('engine-setup-box');
+        box.classList.remove('hidden');
+        alert('llama-server nie zainstalowany. Kliknij "Zainstaluj llama-server" w sekcji Model lokalny.');
+        return;
+    }
+
     setStatus('loading', 'Ladowanie modelu...');
     btnLoadModel.disabled = true;
 
@@ -569,6 +578,17 @@ async function loadModel() {
         } else {
             const data = await resp.json();
             setStatus('error', 'Blad ladowania');
+
+            // Show engine setup box if it's a 503 (engine not installed)
+            if (resp.status === 503) {
+                _engineInstalled = false;
+                const box = $('engine-setup-box');
+                box.classList.remove('hidden', 'installed');
+                $('engine-setup-text').textContent = data.detail || 'llama-server nie zainstalowany.';
+                $('btn-install-engine').classList.remove('hidden');
+                $('btn-install-engine').disabled = false;
+            }
+
             alert('Blad: ' + (data.detail || 'Nieznany blad'));
         }
     } catch (e) {
@@ -576,7 +596,9 @@ async function loadModel() {
         alert('Blad: ' + e.message);
     }
 
-    btnLoadModel.disabled = false;
+    if (_engineInstalled) {
+        btnLoadModel.disabled = false;
+    }
 }
 
 async function unloadModel() {
@@ -839,6 +861,96 @@ function removeAttachment() {
     state.attachedFile = null;
     $('file-attachment').classList.add('hidden');
     $('attached-file-name').textContent = '';
+}
+
+// ──── Engine Setup ────
+
+let _engineInstalled = false;
+
+async function checkEngineSetup() {
+    try {
+        const resp = await fetch('/api/setup/engine-status');
+        const data = await resp.json();
+        _engineInstalled = data.installed;
+
+        const box = $('engine-setup-box');
+        if (!data.installed) {
+            box.classList.remove('hidden', 'installed');
+            $('engine-setup-text').textContent = 'llama-server nie zainstalowany. Zainstaluj silnik aby ladowac modele lokalnie.';
+            $('btn-install-engine').classList.remove('hidden');
+            $('btn-install-engine').disabled = false;
+            $('engine-install-progress').classList.add('hidden');
+            // Disable load button when engine not installed
+            btnLoadModel.disabled = true;
+            btnLoadModel.title = 'Najpierw zainstaluj llama-server';
+        } else {
+            box.classList.add('hidden');
+            btnLoadModel.disabled = false;
+            btnLoadModel.title = '';
+        }
+    } catch (e) {
+        console.error('Engine status check failed:', e);
+    }
+}
+
+async function installEngine() {
+    const btn = $('btn-install-engine');
+    const progressEl = $('engine-install-progress');
+    const fill = $('engine-install-fill');
+    const statusEl = $('engine-install-status');
+
+    btn.disabled = true;
+    btn.textContent = 'Instalowanie...';
+    progressEl.classList.remove('hidden');
+
+    const startTime = Date.now();
+    let fakePct = 0;
+    const pollInterval = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        // Asymptotic progress to 90% over ~120s
+        fakePct = 90 * (1 - Math.exp(-elapsed / 40));
+        fill.style.width = Math.round(fakePct) + '%';
+        const mins = Math.floor(elapsed / 60);
+        const secs = Math.floor(elapsed % 60);
+        statusEl.textContent = `Pobieranie i instalacja... ${Math.round(fakePct)}% (${mins}m ${secs}s)`;
+    }, 500);
+
+    try {
+        const resp = await fetch('/api/setup/install-engine', { method: 'POST' });
+        clearInterval(pollInterval);
+
+        if (resp.ok) {
+            const data = await resp.json();
+            fill.style.width = '100%';
+            statusEl.textContent = 'Zainstalowano pomyslnie!';
+
+            const box = $('engine-setup-box');
+            box.classList.add('installed');
+            $('engine-setup-text').textContent = 'llama-server zainstalowany! Mozesz teraz ladowac modele.';
+            btn.classList.add('hidden');
+
+            _engineInstalled = true;
+            btnLoadModel.disabled = false;
+            btnLoadModel.title = '';
+
+            // Hide after 3s
+            setTimeout(() => {
+                box.classList.add('hidden');
+            }, 3000);
+        } else {
+            const data = await resp.json();
+            fill.style.width = '0%';
+            statusEl.textContent = 'Blad: ' + (data.detail || 'Instalacja nie powiodla sie');
+            btn.disabled = false;
+            btn.textContent = 'Sprobuj ponownie';
+        }
+    } catch (e) {
+        clearInterval(pollInterval);
+        fill.style.width = '0%';
+        statusEl.textContent = 'Blad polaczenia: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = 'Sprobuj ponownie';
+    }
 }
 
 // ──── Providers ────
@@ -1294,6 +1406,9 @@ function setupEventListeners() {
     // Model controls
     btnLoadModel.addEventListener('click', loadModel);
     btnUnloadModel.addEventListener('click', unloadModel);
+
+    // Engine install
+    $('btn-install-engine').addEventListener('click', installEngine);
 
     // Temperature slider
     tempSlider.addEventListener('input', () => {

@@ -27,6 +27,7 @@ from .inference.router import (
     get_router_config, update_router_config, detect_task_type, get_task_scores
 )
 from .usage import usage_tracker
+from .setup import get_engine_status, install_engine
 from .storage import (
     save_conversation, load_conversation, list_conversations,
     delete_conversation, update_conversation_title,
@@ -300,6 +301,23 @@ async def api_reset_usage():
     """Reset all usage statistics."""
     usage_tracker.reset()
     return {"success": True}
+
+
+# ──────────────────────── Engine Setup ────────────────────────
+
+@app.get("/api/setup/engine-status")
+async def api_engine_status():
+    """Check if llama-server binary is installed."""
+    return get_engine_status()
+
+
+@app.post("/api/setup/install-engine")
+async def api_install_engine():
+    """Download and install llama-server binary automatically."""
+    result = await install_engine()
+    if not result["success"]:
+        raise HTTPException(500, result["message"])
+    return result
 
 
 # ──────────────────────── Router ────────────────────────

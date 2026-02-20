@@ -503,6 +503,38 @@ label small {
 
 /* ──── Provider Panel ──── */
 
+/* Engine setup box */
+.engine-setup-box {
+    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.engine-setup-box.installed {
+    background: rgba(0, 184, 148, 0.1);
+    border-color: rgba(0, 184, 148, 0.3);
+}
+
+.engine-setup-msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 0.82em;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.engine-setup-icon {
+    font-size: 1.1em;
+    flex-shrink: 0;
+}
+
+.engine-install-progress {
+    margin-top: 8px;
+}
+
 /* Active provider card */
 .active-provider-card {
     background: var(--bg-tertiary);

@@ -79,6 +79,22 @@
             <!-- Model Selection -->
             <div class="sidebar-section">
                 <h3>Model lokalny</h3>
+
+                <!-- Engine setup notification -->
+                <div id="engine-setup-box" class="engine-setup-box hidden">
+                    <div class="engine-setup-msg">
+                        <span class="engine-setup-icon">&#9888;</span>
+                        <span id="engine-setup-text">llama-server nie zainstalowany. Zainstaluj silnik aby ladowac modele lokalnie.</span>
+                    </div>
+                    <button id="btn-install-engine" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">
+                        &#128229; Zainstaluj llama-server
+                    </button>
+                    <div id="engine-install-progress" class="engine-install-progress hidden">
+                        <div class="dl-progress-bar"><div id="engine-install-fill" class="dl-progress-fill"></div></div>
+                        <div id="engine-install-status" class="dl-progress-info" style="justify-content:center">Instalowanie...</div>
+                    </div>
+                </div>
+
                 <select id="model-select" class="select-full">
                     <option value="">-- Wybierz model --</option>
                 </select>

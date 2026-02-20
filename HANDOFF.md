@@ -1,8 +1,9 @@
 # NeuroForge ML/AI - Handoff dla nowego AI
 
 ## TL;DR
-**NeuroForge Local AI Studio v0.3.0** - kompletna aplikacja do uruchamiania lokalnych LLM na GPU AMD RX 9070 XT.
-FastAPI backend + vanilla JS frontend + llama.cpp inference. **Kod jest GOTOWY i KOMPLETNY** - ~45 plików, ~6500 linii + 60 testów.
+**NeuroForge Local AI Studio v0.5.0** - kompletna aplikacja do uruchamiania lokalnych LLM i zewnetrznych API AI na GPU AMD RX 9070 XT.
+FastAPI backend + vanilla JS frontend + llama.cpp inference + 6 providerow AI (OpenAI, Anthropic, Google, Ollama, OpenRouter).
+**Kod jest GOTOWY i KOMPLETNY** - ~55 plikow, ~10000 linii + 167 testow.
 
 ---
 
@@ -76,28 +77,40 @@ ML-AI/
 ## Co jest GOTOWE (100%)
 
 ### Backend
-- **FastAPI app** z 20+ REST endpointami + 2 WebSockety (chat + monitor)
-- **Inference engine** - zarządzanie procesem llama-server (start/stop/health check)
-- **Model manager** - 5 rekomendowanych modeli, pobieranie z HuggingFace
-- **Agent loop** - pętla rozumowania z wywołaniami narzędzi, streaming eventów
-- **8 narzędzi:** filesystem, code executor, web search, web fetch, shell, process monitor, RAG search
-- **RAG engine** - TF-IDF, chunking z overlap, indeksowanie dokumentów
-- **Storage** - persystencja konwersacji jako JSON
+- **FastAPI app** z 35+ REST endpointami + 2 WebSockety (chat + monitor)
+- **Inference engine** - zarzadzanie procesem llama-server (start/stop/health check)
+- **Model manager** - 13 rekomendowanych modeli z kategoriami, pobieranie z HuggingFace z prawdziwym postepem (SSE)
+- **Agent loop** - petla rozumowania z wywolaniami narzedzi, streaming eventow, fallback chain
+- **6 providerow AI:** Local (llama.cpp), OpenAI, Anthropic (Claude), Google Gemini, Ollama, OpenRouter
+- **Fallback chain** - automatyczne przelaczanie na zapasowego providera gdy glowny zawiedzie
+- **Smart routing** - proste pytania -> model lokalny, zlozone -> API w chmurze
+- **Usage tracking** - sledzenie tokenow i kosztow per provider z szacunkami cen
+- **8 narzedzi:** filesystem, code executor, web search, web fetch, shell, process monitor, RAG search
+- **RAG engine** - TF-IDF, chunking z overlap, trwaly indeks na dysku (v2 - instant restart)
+- **Storage** - persystencja konwersacji jako JSON + eksport do Markdown/JSON
 - **Monitor** - CPU/RAM/dysk/GPU (AMD rocm-smi + NVIDIA nvidia-smi)
-- **12 szablonów promptów** po polsku (code review, testy, tłumaczenia, refaktoring...)
+- **12 szablonow promptow** po polsku (code review, testy, tlumaczenia, refaktoring...)
+- **Auto-setup** - instalacja llama-server z poziomu UI (bez recznego uruchamiania install.py)
 
 ### Frontend
 - **Dark theme** z fioletowym akcentem (#6c5ce7)
 - **Real-time chat** przez WebSocket ze streamingiem
-- **Panel boczny:** historia konwersacji, zarządzanie modelami, ustawienia GPU, upload dokumentów
-- **Panel szablonów** z kategoriami (coding, text, tools)
-- **Monitor systemowy** z auto-odświeżaniem co 2s
-- **Responsywny** - działa na mobile
+- **Syntax highlighting** - kolorowanie kodu (highlight.js) z przyciskiem Kopiuj
+- **Panel boczny:** historia konwersacji (z eksportem MD/JSON), zarzadzanie modelami, ustawienia GPU
+- **Panel Provider AI** - wybor providera, fallback chain, smart routing, klucze API
+- **Dedykowana zakladka Klucze API** - formularze per provider z zapisem/usuwaniem
+- **Katalog modeli** - 13 modeli w 5 kategoriach (kodowanie, ogolne, kreatywne, lekkie, powerhouse)
+- **Prawdziwy pasek postepu** pobierania modeli (%, MB/s, ETA)
+- **Status bar** aktywnego providera z zuzyciem tokenow i kosztem
+- **Panel szablonow** z kategoriami (coding, text, tools)
+- **Monitor systemowy** z auto-odswiezaniem co 2s
+- **Responsywny** - dziala na mobile
 
 ### Instalacja
-- **install.py** - tworzy venv, instaluje zależności, pobiera llama.cpp binary (Vulkan)
+- **install.py** - tworzy venv, instaluje zaleznosci, pobiera llama.cpp binary (Vulkan)
+- **Auto-install z UI** - przycisk "Zainstaluj llama-server" w panelu bocznym
 - **install.bat** - one-click dla Windows
-- **run.py** - startuje serwer, otwiera przeglądarkę
+- **run.py** - startuje serwer, otwiera przegladarke
 
 ---
 
@@ -125,11 +138,27 @@ ML-AI/
 
 ### Modele
 - `GET /api/models` - lista lokalnych modeli .gguf
-- `GET /api/models/recommended` - 5 rekomendowanych z statusem pobrania
-- `POST /api/models/load` - załaduj model (body: `{filename, gpu_layers, context_size, threads}`)
-- `POST /api/models/unload` - wyładuj model
-- `POST /api/models/download` - pobierz z HuggingFace (body: `{repo_id, filename}`)
+- `GET /api/models/recommended` - 13 rekomendowanych z kategoriami i statusem pobrania
+- `POST /api/models/load` - zaladuj model (body: `{filename, gpu_layers, context_size, threads}`)
+- `POST /api/models/unload` - wyladuj model
+- `POST /api/models/download` - pobierz z HuggingFace (SSE z postepem: %, MB/s, ETA)
 - `GET /api/status` - status silnika i systemu
+
+### Providery AI
+- `GET /api/providers` - lista providerow z ich statusem i modelami
+- `POST /api/providers/activate` - aktywuj providera (body: `{provider_id, model}`)
+- `POST /api/providers/key` - ustaw klucz API (body: `{provider_id, api_key}`)
+- `DELETE /api/providers/key/{id}` - usun klucz API
+- `POST /api/providers/fallback` - ustaw lancuch fallback (body: `{chain: [...]}`)
+- `POST /api/providers/smart-routing` - wlacz/wylacz smart routing (body: `{enabled}`)
+
+### Usage Tracking
+- `GET /api/usage` - statystyki zuzycia per provider (tokeny, koszt)
+- `POST /api/usage/reset` - resetuj statystyki
+
+### Engine Setup
+- `GET /api/setup/engine-status` - czy llama-server jest zainstalowany
+- `POST /api/setup/install-engine` - automatyczna instalacja llama-server
 
 ### Chat
 - `WS /ws/chat` - WebSocket real-time chat z agentem
@@ -137,43 +166,57 @@ ML-AI/
 
 ### Konwersacje
 - `GET /api/conversations` - lista zapisanych
-- `GET /api/conversations/{id}` - załaduj konkretną
-- `DELETE /api/conversations/{id}` - usuń
-- `PATCH /api/conversations/{id}` - zmień tytuł
+- `GET /api/conversations/{id}` - zaladuj konkretna
+- `GET /api/conversations/{id}/export?format=markdown|json` - eksport konwersacji
+- `DELETE /api/conversations/{id}` - usun
+- `PATCH /api/conversations/{id}` - zmien tytul
 
 ### Monitor
 - `GET /api/monitor` - snapshot CPU/RAM/dysk/GPU
-- `GET /api/monitor/processes` - top 15 procesów
+- `GET /api/monitor/processes` - top 15 procesow
 - `WS /ws/monitor` - real-time co 2s
 
 ### RAG/Dokumenty
 - `GET /api/documents` - lista zindeksowanych
 - `POST /api/documents/upload` - upload i indeksuj
 - `POST /api/documents/index-text` - indeksuj surowy tekst
-- `DELETE /api/documents/{id}` - usuń dokument
+- `DELETE /api/documents/{id}` - usun dokument
 - `GET /api/documents/search` - szukaj w dokumentach
 
+### Router
+- `GET /api/router` - konfiguracja routera
+- `POST /api/router` - aktualizuj (body: `{enabled, assignments}`)
+- `POST /api/router/test` - testuj klasyfikacje (body: `{message}`)
+
 ### Szablony
-- `GET /api/templates` - lista szablonów
-- `POST /api/templates` - utwórz własny
-- `DELETE /api/templates/{id}` - usuń
+- `GET /api/templates` - lista szablonow
+- `POST /api/templates` - utworz wlasny
+- `DELETE /api/templates/{id}` - usun
 
 ### Pliki i konfiguracja
 - `POST /api/upload` - upload pliku do chatu (max 50MB)
-- `GET /api/config` - pobierz konfigurację
-- `POST /api/config` - zaktualizuj konfigurację
+- `GET /api/config` - pobierz konfiguracje
+- `POST /api/config` - zaktualizuj konfiguracje
 
 ---
 
-## Rekomendowane modele (wbudowane)
+## Rekomendowane modele (13 wbudowanych, 5 kategorii)
 
-| Model | Rozmiar | Zastosowanie |
-|-------|---------|-------------|
-| Qwen2.5-7B-Instruct Q4_K_M | 4.7 GB | Ogólny, szybki |
-| Qwen2.5-14B-Instruct Q4_K_M | 8.9 GB | Lepszy ogólny |
-| Qwen2.5-Coder-7B-Instruct Q4_K_M | 4.7 GB | Kodowanie |
-| Llama-3.1-8B-Instruct Q4_K_M | 4.9 GB | Meta, ogólny |
-| Mistral-Nemo-12B-Instruct Q4_K_M | 7.1 GB | Kreatywny |
+| Model | Rozmiar | Kategoria | Zastosowanie |
+|-------|---------|-----------|-------------|
+| Qwen2.5-Coder-7B Q4_K_M | 4.7 GB | Kodowanie | Kod Python, JS, TS |
+| Qwen2.5-Coder-14B Q4_K_M | 8.9 GB | Kodowanie | Code review, refaktoring |
+| DeepSeek-Coder-V2-Lite Q4_K_M | 9.4 GB | Kodowanie | Debugging, generowanie |
+| Qwen2.5-7B-Instruct Q4_K_M | 4.7 GB | Ogolne | Szybki, polski |
+| Qwen2.5-14B-Instruct Q4_K_M | 8.9 GB | Ogolne | Lepsza jakosc |
+| Llama-3.1-8B-Instruct Q4_K_M | 4.9 GB | Ogolne | Tool use, angielski |
+| Gemma-2-9B-Instruct Q4_K_M | 5.8 GB | Ogolne | Analiza, rozumowanie |
+| Mistral-Nemo-12B Q4_K_M | 7.1 GB | Ogolne | Function calling |
+| Phi-4-14B Q4_K_M | 8.4 GB | Ogolne | Matematyka, rozumowanie |
+| Mistral-Small-24B Q4_K_M | 14.1 GB | Kreatywne | Dlugie teksty, tlumaczenia |
+| Llama-3.1-70B-Instruct Q4_K_M | 42.0 GB | Powerhouse | Poziom GPT-4 (48GB+ RAM) |
+| Qwen2.5-3B-Instruct Q4_K_M | 2.0 GB | Lekkie | Slabsze komputery |
+| Llama-3.2-3B-Instruct Q4_K_M | 2.0 GB | Lekkie | Proste pytania |
 
 ---
 
@@ -240,63 +283,63 @@ ML-AI/
 - [x] **Logging** zamiast cichego połykania błędów w monitorze GPU
 - [x] **.gitignore** + pyproject.toml + zunifikowane start.bat/start.sh
 
-### v0.4 - External AI APIs (GOTOWE - aktualny stan)
-> Podpięcie zewnętrznych providerów AI obok lokalnego llama.cpp.
+### v0.4 - External AI APIs (GOTOWE)
+> Podpiecie zewnetrznych providerow AI obok lokalnego llama.cpp.
 
-- [x] **Abstrakcja providerów** - BaseProvider ABC + ProviderRegistry (wspólny interfejs)
-- [x] **LocalProvider** - wrapper na istniejący llama.cpp engine
-- [x] **OpenAI API** - GPT-4o, GPT-4o-mini, GPT-4.1, o3-mini (gotowe po dodaniu klucza)
-- [x] **Anthropic API** - Claude Sonnet 4.5, Haiku 4.5, Opus 4.6 (z translacją formatów)
-- [x] **Google Gemini API** - Gemini 2.5 Flash/Pro, 2.0 Flash (z translacją formatów)
-- [x] **Ollama** - integracja z lokalnym Ollama (OpenAI-compatible endpoint)
-- [x] **OpenRouter** - jeden klucz API → 8+ prekonfigurowanych modeli
-- [x] **UI: panel providerów** - wybór providera, model selector, dodawanie kluczy API
-- [x] **Agent loop integration** - cloud provider lub local engine, transparentnie
-- [x] **API:** GET /api/providers, POST activate/key, DELETE key + GET /api/usage, POST reset
-- [x] **Config:** sekcja providers w config.yaml z persystencją kluczy
-- [x] **Provider status bar** - widoczny na górze chatu (nazwa providera, model, tokeny, koszt)
-- [x] **Usage tracking** - śledzenie tokenów/kosztów per provider z szacunkiem cen
-- [x] **Panel zużycia** - karta per provider z: requests, tokeny in/out, koszt szacunkowy
-- [x] **Keys grid** - chipy w sidebarze pokazujące które API są skonfigurowane
-- [x] **Real-time updates** - WebSocket `usage_update` aktualizuje status bar na bieżąco
-- [x] **Testy:** 58 testów (36 providers + 22 usage tracking), 142 razem
-- [ ] **TODO (v0.5):** Routing po providerze (coding→Qwen, creative→Claude)
-- [ ] **TODO (v0.5):** Tryb hybrydowy - lokalne dla prostych, chmurowe dla trudnych
+- [x] **Abstrakcja providerow** - BaseProvider ABC + ProviderRegistry (wspolny interfejs)
+- [x] **6 providerow:** Local, OpenAI, Anthropic, Google Gemini, Ollama, OpenRouter
+- [x] **UI: panel providerow** - wybor, model selector, klucze API, status bar
+- [x] **Usage tracking** - tokeny/koszty per provider z szacunkami cen
+- [x] **Testy:** 58 testow (36 providers + 22 usage tracking)
 
-### v0.5 - Multi-Agent (DO ZROBIENIA)
-> Kilka agentów AI współpracuje nad złożonym zadaniem.
+### v0.5 - Hybrid Mode + UX (GOTOWE - aktualny stan)
+> Tryb hybrydowy, lepszy UX, nowe funkcje.
 
-- [ ] Orkiestrator agentów - koordynacja zadań między agentami
-- [ ] Role agentów (planer, coder, reviewer, researcher)
-- [ ] Komunikacja między agentami (message passing)
-- [ ] Każdy agent może używać innego modelu/providera (lokalne + chmurowe)
-- [ ] UI: wizualizacja przepływu pracy agentów
-- [ ] Równoległe wykonywanie podzadań
-- [ ] Shared context / pamięć współdzielona między agentami
+- [x] **Fallback chain** - automatyczne przelaczanie na zapasowego providera
+- [x] **Smart routing** - proste pytania → model lokalny, zlozone → API w chmurze
+- [x] **Auto-install llama-server** - instalacja silnika z poziomu UI (bez install.py)
+- [x] **Dedykowana zakladka Klucze API** - formularze per provider z zapisem/usuwaniem
+- [x] **Rozszerzony katalog modeli** - 13 modeli w 5 kategoriach z opisami PL
+- [x] **Prawdziwy postep pobierania** - SSE stream z %, MB/s, ETA (nie fake progress)
+- [x] **Syntax highlighting** - kolorowanie kodu w czacie (highlight.js + atom-one-dark)
+- [x] **Przycisk Kopiuj kod** - na kazdym bloku kodu w czacie
+- [x] **Eksport konwersacji** - pobieranie rozmow jako Markdown lub JSON
+- [x] **Trwaly indeks RAG v2** - pelny zapis TF-IDF na dysk (instant restart)
+- [x] **Karta aktywnego providera** - info + przycisk dezaktywacji
+- [x] **Testy:** 167 testow razem
 
-### v0.6 - Vision (DO ZROBIENIA)
-> Analiza obrazów i screenshotów przez modele multimodalne.
+### v0.6 - Multi-Agent (DO ZROBIENIA)
+> Kilka agentow AI wspolpracuje nad zlozonym zadaniem.
 
-- [ ] Obsługa modeli multimodalnych (LLaVA, Qwen-VL, GPT-4o vision)
-- [ ] Upload i analiza obrazów w chacie
+- [ ] Orkiestrator agentow - koordynacja zadan miedzy agentami
+- [ ] Role agentow (planer, coder, reviewer, researcher)
+- [ ] Komunikacja miedzy agentami (message passing)
+- [ ] Kazdy agent moze uzywac innego modelu/providera (lokalne + chmurowe)
+- [ ] UI: wizualizacja przeplywu pracy agentow
+- [ ] Rownolegle wykonywanie podzadan
+- [ ] Shared context / pamiec wspoldzielona miedzy agentami
+
+### v0.7 - Vision (DO ZROBIENIA)
+> Analiza obrazow i screenshotow przez modele multimodalne.
+
+- [ ] Obsluga modeli multimodalnych (LLaVA, Qwen-VL, GPT-4o vision)
+- [ ] Upload i analiza obrazow w chacie
 - [ ] Screenshot tool - przechwytywanie ekranu
-- [ ] OCR z obrazów (wyciąganie tekstu)
-- [ ] Generowanie opisów obrazów
-- [ ] UI: podgląd obrazów w konwersacji
+- [ ] OCR z obrazow (wyciaganie tekstu)
+- [ ] Generowanie opisow obrazow
+- [ ] UI: podglad obrazow w konwersacji
 
 ### v1.0 - Production Release (DO ZROBIENIA)
-> Dopracowany produkt gotowy do codziennego użytku.
+> Dopracowany produkt gotowy do codziennego uzytku.
 
-- [ ] **System pluginów** - dynamiczne ładowanie narzędzi z katalogu plugins/
-- [ ] **Profile użytkowników** - ustawienia, historia, preferencje per user
+- [ ] **System pluginow** - dynamiczne ladowanie narzedzi z katalogu plugins/
+- [ ] **Profile uzytkownikow** - ustawienia, historia, preferencje per user
 - [ ] **Polished UI** - animacje, onboarding, lepszy UX
-- [ ] **i18n** - wielojęzyczne szablony i interfejs (PL + EN)
-- [ ] **Eksport konwersacji** - markdown, PDF, JSON
-- [ ] **Rate limiting + auth token** - bezpieczeństwo API
+- [ ] **i18n** - wielojezyczne szablony i interfejs (PL + EN)
+- [ ] **Eksport PDF** - eksport konwersacji jako PDF
+- [ ] **Rate limiting + auth token** - bezpieczenstwo API
 - [ ] **PWA** - manifest + service worker (offline mode)
-- [ ] **Persistent RAG index** - zapis na dysk zamiast rebuild po restarcie
-- [ ] **Streaming HTTP** - SSE w REST endpoint (nie tylko WebSocket)
-- [ ] **Więcej narzędzi** - git, baza danych SQL, API caller, image gen
+- [ ] **Wiecej narzedzi** - git, baza danych SQL, API caller, image gen
 
 ---
 

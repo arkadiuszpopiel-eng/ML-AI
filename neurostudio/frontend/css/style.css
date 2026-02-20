@@ -200,6 +200,37 @@ html, body {
     font-size: 0.7em;
     color: var(--text-muted);
     margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.conv-actions {
+    display: none;
+    gap: 2px;
+}
+
+.conversation-item:hover .conv-actions {
+    display: inline-flex;
+}
+
+.conv-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95em;
+    padding: 1px 3px;
+    border-radius: 3px;
+    opacity: 0.6;
+    transition: opacity var(--transition);
+}
+
+.conv-btn:hover {
+    opacity: 1;
+}
+
+.conv-btn-del:hover {
+    color: var(--danger);
 }
 
 /* ──── Buttons ──── */
@@ -1365,18 +1396,46 @@ label small {
     border-radius: 0 0 8px 8px;
 }
 
-.code-block-wrapper .code-lang-label {
-    display: block;
+.code-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     border-bottom: none;
     border-radius: 8px 8px 0 0;
-    padding: 4px 12px;
+    padding: 4px 8px 4px 12px;
+}
+
+.code-block-header .code-lang-label {
     font-size: 0.75em;
     color: var(--text-secondary);
     font-family: inherit;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.btn-copy-code {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 0.72em;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.btn-copy-code:hover {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border-color: var(--accent);
+}
+
+.btn-copy-code.copied {
+    background: var(--success);
+    color: #fff;
+    border-color: var(--success);
 }
 
 /* Override highlight.js background to match our theme */

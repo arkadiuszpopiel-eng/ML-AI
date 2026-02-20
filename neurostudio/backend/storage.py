@@ -116,3 +116,75 @@ def update_conversation_title(session_id: str, title: str) -> bool:
     path = HISTORY_DIR / f"{session_id}.json"
     _atomic_write_json(path, data)
     return True
+
+
+def export_conversation_markdown(session_id: str) -> Optional[str]:
+    """Export a conversation as Markdown text.
+
+    Format:
+        # Title
+        _Date_
+
+        ---
+
+        **User:**
+        message
+
+        **AI:**
+        response
+
+        > Tool: tool_name(args)
+        > Result: ...
+    """
+    data = load_conversation(session_id)
+    if not data:
+        return None
+
+    meta = data.get("meta", {})
+    messages = data.get("messages", [])
+    title = meta.get("title", "Konwersacja")
+
+    from datetime import datetime
+    created = meta.get("created_at")
+    date_str = datetime.fromtimestamp(created).strftime("%Y-%m-%d %H:%M") if created else ""
+
+    lines = [f"# {title}", ""]
+    if date_str:
+        lines.append(f"*{date_str}*")
+        lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    for msg in messages:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+
+        if role == "system":
+            continue
+        elif role == "user":
+            lines.append(f"**User:**")
+            lines.append(content)
+            lines.append("")
+        elif role == "assistant":
+            # Check for tool calls
+            tool_calls = msg.get("tool_calls", [])
+            if content:
+                lines.append(f"**AI:**")
+                lines.append(content)
+                lines.append("")
+            if tool_calls:
+                for tc in tool_calls:
+                    func = tc.get("function", {})
+                    name = func.get("name", "?")
+                    args = func.get("arguments", "{}")
+                    lines.append(f"> Tool: `{name}({args})`")
+                lines.append("")
+        elif role == "tool":
+            # Tool result - show condensed
+            tool_content = content[:200]
+            if len(content) > 200:
+                tool_content += "..."
+            lines.append(f"> Result: `{tool_content}`")
+            lines.append("")
+
+    return "\n".join(lines)

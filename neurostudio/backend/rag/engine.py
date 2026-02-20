@@ -216,9 +216,14 @@ class RAGEngine:
         return [doc.to_dict() for doc in self.documents.values()]
 
     def _save_index(self):
-        """Save index metadata to disk."""
+        """Save full index to disk (documents + chunk index + IDF).
+
+        Saves the complete TF-IDF state so restart is instant without
+        re-chunking and re-tokenizing all documents.
+        """
         _ensure_dirs()
         data = {
+            "version": 2,
             "documents": {
                 doc_id: {
                     "filename": doc.filename,
@@ -228,13 +233,27 @@ class RAGEngine:
                     "indexed_at": doc.indexed_at,
                 }
                 for doc_id, doc in self.documents.items()
-            }
+            },
+            "chunk_index": [
+                {
+                    "doc_id": entry["doc_id"],
+                    "chunk_idx": entry["chunk_idx"],
+                    "tf": entry["tf"],
+                    "text": entry["text"],
+                }
+                for entry in self.chunk_index
+            ],
+            "idf": self.idf,
         }
         with open(INDEX_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False)
 
     def _load_index(self):
-        """Load index from disk on startup."""
+        """Load index from disk on startup.
+
+        If the saved index is v2 (has chunk_index + idf), restores instantly.
+        Otherwise falls back to re-chunking from document files.
+        """
         _ensure_dirs()
         if not INDEX_PATH.exists():
             return
@@ -242,20 +261,36 @@ class RAGEngine:
         try:
             with open(INDEX_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
+        except (json.JSONDecodeError, KeyError):
+            return
 
-            for doc_id, meta in data.get("documents", {}).items():
-                doc_path = DOCS_DIR / f"{doc_id}.txt"
-                if not doc_path.exists():
+        version = data.get("version", 1)
+
+        # Load documents (common to both versions)
+        for doc_id, meta in data.get("documents", {}).items():
+            doc_path = DOCS_DIR / f"{doc_id}.txt"
+            if not doc_path.exists():
+                continue
+
+            content = doc_path.read_text(encoding="utf-8")
+            chunks = self._chunk_text(content)
+
+            doc = Document(doc_id, meta["filename"], content, chunks, meta.get("metadata"))
+            doc.indexed_at = meta.get("indexed_at", 0)
+            self.documents[doc_id] = doc
+
+        if version >= 2 and "chunk_index" in data and "idf" in data:
+            # Fast path: restore pre-computed index
+            for entry in data["chunk_index"]:
+                if entry["doc_id"] not in self.documents:
                     continue
-
-                content = doc_path.read_text(encoding="utf-8")
-                chunks = self._chunk_text(content)
-
-                doc = Document(doc_id, meta["filename"], content, chunks, meta.get("metadata"))
-                doc.indexed_at = meta.get("indexed_at", 0)
-                self.documents[doc_id] = doc
-
-                for i, chunk in enumerate(chunks):
+                entry["tokens"] = list(entry["tf"].keys())
+                self.chunk_index.append(entry)
+            self.idf = data["idf"]
+        else:
+            # Legacy v1: re-chunk and re-tokenize
+            for doc_id, doc in self.documents.items():
+                for i, chunk in enumerate(doc.chunks):
                     tokens = _tokenize(chunk)
                     tf = _compute_tf(tokens)
                     self.chunk_index.append({
@@ -265,10 +300,7 @@ class RAGEngine:
                         "tf": tf,
                         "text": chunk,
                     })
-
             self._rebuild_idf()
-        except (json.JSONDecodeError, KeyError):
-            pass
 
 
 # Singleton

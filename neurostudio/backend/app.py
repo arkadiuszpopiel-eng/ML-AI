@@ -31,6 +31,7 @@ from .setup import get_engine_status, install_engine
 from .storage import (
     save_conversation, load_conversation, list_conversations,
     delete_conversation, update_conversation_title,
+    export_conversation_markdown,
 )
 from .monitor import get_system_snapshot, get_process_info
 from .rag.engine import rag_engine
@@ -52,7 +53,7 @@ async def lifespan(app: FastAPI):
     await engine.stop()
 
 
-app = FastAPI(title="NeuroForge", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="NeuroForge", version="0.5.0", lifespan=lifespan)
 
 # Mount static files
 app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
@@ -570,6 +571,32 @@ async def api_rename_conversation(session_id: str, req: ConversationRenameReques
     if not update_conversation_title(session_id, req.title):
         raise HTTPException(404, "Conversation not found")
     return {"success": True}
+
+
+@app.get("/api/conversations/{session_id}/export")
+async def api_export_conversation(session_id: str, format: str = "markdown"):
+    """Export a conversation as downloadable file."""
+    if format == "markdown":
+        md = export_conversation_markdown(session_id)
+        if not md:
+            raise HTTPException(404, "Conversation not found")
+        return StreamingResponse(
+            iter([md]),
+            media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="conversation-{session_id[:8]}.md"'},
+        )
+    elif format == "json":
+        data = load_conversation(session_id)
+        if not data:
+            raise HTTPException(404, "Conversation not found")
+        content = json.dumps(data, ensure_ascii=False, indent=2)
+        return StreamingResponse(
+            iter([content]),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="conversation-{session_id[:8]}.json"'},
+        )
+    else:
+        raise HTTPException(400, f"Unknown format: {format}. Use 'markdown' or 'json'.")
 
 
 @app.get("/api/sessions")

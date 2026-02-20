@@ -318,17 +318,16 @@ async function loadConversationHistory() {
 
             el.innerHTML = `
                 <div class="conv-title">${escapeHtml(conv.title || 'Nowa rozmowa')}</div>
-                <div class="conv-meta">${dateStr} &middot; ${conv.message_count || 0} wiad.</div>
+                <div class="conv-meta">
+                    ${dateStr} &middot; ${conv.message_count || 0} wiad.
+                    <span class="conv-actions">
+                        <button class="conv-btn" onclick="event.stopPropagation(); exportConversation('${conv.session_id}', 'markdown')" title="Eksport MD">&#128196;</button>
+                        <button class="conv-btn" onclick="event.stopPropagation(); exportConversation('${conv.session_id}', 'json')" title="Eksport JSON">&#123;&#125;</button>
+                        <button class="conv-btn conv-btn-del" onclick="event.stopPropagation(); if(confirm('Usunac?')) deleteConversation('${conv.session_id}')" title="Usun">&#128465;</button>
+                    </span>
+                </div>
             `;
             el.onclick = () => switchToConversation(conv.session_id);
-
-            // Right-click to delete
-            el.oncontextmenu = (e) => {
-                e.preventDefault();
-                if (confirm('Usunac te rozmowe?')) {
-                    deleteConversation(conv.session_id);
-                }
-            };
 
             container.appendChild(el);
         }
@@ -371,6 +370,17 @@ async function deleteConversation(sessionId) {
     } catch (e) {
         console.error('Failed to delete conversation:', e);
     }
+}
+
+function exportConversation(sessionId, format) {
+    // Trigger file download via hidden link
+    const url = `/api/conversations/${sessionId}/export?format=${format}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conversation-${sessionId.slice(0, 8)}.${format === 'markdown' ? 'md' : 'json'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 // ──── Model Management ────
@@ -1667,7 +1677,8 @@ function renderMarkdown(text) {
     // Simple markdown rendering with syntax highlighting
     let html = escapeHtml(text);
 
-    // Code blocks ```lang...``` with syntax highlighting
+    // Code blocks ```lang...``` with syntax highlighting + copy button
+    let blockId = 0;
     html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
         const trimmed = code.trim();
         let highlighted;
@@ -1686,8 +1697,10 @@ function renderMarkdown(text) {
         } else {
             highlighted = trimmed;
         }
+        const bid = `codeblock-${Date.now()}-${blockId++}`;
         const langLabel = lang ? `<span class="code-lang-label">${lang}</span>` : '';
-        return `<div class="code-block-wrapper">${langLabel}<pre><code class="hljs lang-${lang}">${highlighted}</code></pre></div>`;
+        const copyBtn = `<button class="btn-copy-code" data-code-id="${bid}" onclick="copyCodeBlock(this)" title="Kopiuj kod">Kopiuj</button>`;
+        return `<div class="code-block-wrapper"><div class="code-block-header">${langLabel}${copyBtn}</div><pre><code class="hljs lang-${lang}" id="${bid}">${highlighted}</code></pre></div>`;
     });
 
     // Inline code `...`
@@ -1713,6 +1726,38 @@ function renderMarkdown(text) {
     return html;
 }
 
+function copyCodeBlock(btn) {
+    const codeId = btn.dataset.codeId;
+    const codeEl = document.getElementById(codeId);
+    if (!codeEl) return;
+
+    const text = codeEl.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Skopiowano!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Kopiuj';
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(() => {
+        // Fallback for older browsers
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.left = '-9999px';
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        document.body.removeChild(area);
+        btn.textContent = 'Skopiowano!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Kopiuj';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+
 function scrollToBottom() {
     requestAnimationFrame(() => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -1725,3 +1770,6 @@ window.removeDocument = removeDocument;
 window.removeAttachment = removeAttachment;
 window.toggleMonitor = toggleMonitor;
 window.testRouter = testRouter;
+window.copyCodeBlock = copyCodeBlock;
+window.exportConversation = exportConversation;
+window.deleteConversation = deleteConversation;

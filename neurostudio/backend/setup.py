@@ -10,6 +10,7 @@ import platform
 import stat
 import urllib.request
 import zipfile
+import tarfile
 from pathlib import Path
 
 from .config import load_config, save_config, BASE_DIR
@@ -36,45 +37,64 @@ def get_engine_status() -> dict:
     }
 
 
+def _strip_archive_ext(name: str) -> str:
+    """Strip archive extensions (.zip, .tar.gz, .tar.xz) from filename."""
+    for ext in (".tar.gz", ".tar.xz", ".tar.bz2", ".zip"):
+        if name.endswith(ext):
+            return name[: -len(ext)]
+    return name
+
+
 def _get_download_url() -> tuple[str | None, str | None]:
     """Determine the correct llama.cpp download URL for this platform."""
     system = platform.system().lower()
     machine = platform.machine().lower()
 
+    # Platform-specific keywords (specific enough to avoid cross-platform matches)
     if system == "windows":
-        target = "vulkan-x64.zip"
-        fallback = "win-avx2-x64.zip"
+        targets = ["win-vulkan-x64", "vulkan-x64"]
+        fallbacks = ["win-avx2-x64", "win-x64"]
     elif system == "linux":
-        target = "ubuntu-x64.zip"
-        fallback = target
+        targets = ["ubuntu-vulkan-x64", "ubuntu-x64"]
+        fallbacks = ["linux-x64"]
     elif system == "darwin":
-        target = "macos-arm64.zip" if "arm" in machine else "macos-x64.zip"
-        fallback = target
+        if "arm" in machine:
+            targets = ["macos-arm64"]
+        else:
+            targets = ["macos-x64"]
+        fallbacks = targets
     else:
         return None, None
 
     try:
         req = urllib.request.Request(
             LLAMA_RELEASES_URL,
-            headers={"User-Agent": "NeuroForge-Setup/0.4"},
+            headers={"User-Agent": "NeuroForge-Setup/0.6"},
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
             release = json.loads(resp.read().decode())
 
-        for asset in release.get("assets", []):
-            name = asset["name"].lower()
-            if target.replace(".zip", "") in name.replace(".zip", ""):
-                return asset["browser_download_url"], asset["name"]
+        assets = release.get("assets", [])
 
-        for asset in release.get("assets", []):
-            name = asset["name"].lower()
-            if fallback.replace(".zip", "") in name.replace(".zip", ""):
-                return asset["browser_download_url"], asset["name"]
+        # Primary: try specific platform matches
+        for target in targets:
+            for asset in assets:
+                name_stripped = _strip_archive_ext(asset["name"].lower())
+                if target in name_stripped:
+                    return asset["browser_download_url"], asset["name"]
 
+        # Fallback: try less specific matches
+        for fb in fallbacks:
+            for asset in assets:
+                name_stripped = _strip_archive_ext(asset["name"].lower())
+                if fb in name_stripped:
+                    return asset["browser_download_url"], asset["name"]
+
+        # Last resort for Windows: any vulkan build clearly for Windows
         if system == "windows":
-            for asset in release.get("assets", []):
-                name = asset["name"].lower()
-                if "vulkan" in name and name.endswith(".zip"):
+            for asset in assets:
+                name_stripped = _strip_archive_ext(asset["name"].lower())
+                if "vulkan" in name_stripped and "win" in name_stripped:
                     return asset["browser_download_url"], asset["name"]
 
     except Exception as e:
@@ -122,11 +142,11 @@ async def install_engine(progress_callback=None) -> dict:
     await report("download", 10, f"Pobieranie {filename}...")
 
     BIN_DIR.mkdir(parents=True, exist_ok=True)
-    zip_path = BIN_DIR / (filename or "llama-cpp.zip")
+    archive_path = BIN_DIR / (filename or "llama-cpp.zip")
 
     # Download in a thread to avoid blocking
     try:
-        download_result = await asyncio.to_thread(_download_file, str(url), str(zip_path))
+        download_result = await asyncio.to_thread(_download_file, str(url), str(archive_path))
         if not download_result:
             return {
                 "success": False,
@@ -142,12 +162,24 @@ async def install_engine(progress_callback=None) -> dict:
 
     await report("extract", 70, "Rozpakowywanie...")
 
-    # Extract
+    # Extract (supports both .zip and .tar.gz)
     try:
         def _extract():
-            with zipfile.ZipFile(str(zip_path), "r") as zf:
-                zf.extractall(str(BIN_DIR))
-            os.remove(str(zip_path))
+            path = str(archive_path)
+            dest = str(BIN_DIR)
+            if path.endswith(".tar.gz") or path.endswith(".tgz"):
+                with tarfile.open(path, "r:gz") as tf:
+                    tf.extractall(dest)
+            elif path.endswith(".tar.xz"):
+                with tarfile.open(path, "r:xz") as tf:
+                    tf.extractall(dest)
+            elif path.endswith(".tar.bz2"):
+                with tarfile.open(path, "r:bz2") as tf:
+                    tf.extractall(dest)
+            else:
+                with zipfile.ZipFile(path, "r") as zf:
+                    zf.extractall(dest)
+            os.remove(path)
 
         await asyncio.to_thread(_extract)
     except Exception as e:

@@ -338,6 +338,18 @@ workflow_error  → {message}
 
 ---
 
+## Naprawione bugi (v0.6.0)
+
+- **[FIX] Windows pobierał plik ubuntu zamiast win** - matchowanie `vulkan-x64` było za ogólne,
+  łapało zarówno `win-vulkan-x64` jak i `ubuntu-vulkan-x64`. Naprawiono: platform-specific keywords
+  (`win-vulkan-x64` dla Windows, `ubuntu-vulkan-x64` dla Linux).
+- **[FIX] Ekstrakcja .tar.gz jako .zip** - llama.cpp przeszedł z .zip na .tar.gz dla Linux.
+  Kod używał `zipfile.ZipFile` co failowało na .tar.gz. Naprawiono: auto-detekcja formatu archiwum
+  (.zip, .tar.gz, .tar.xz, .tar.bz2) w install.py i setup.py.
+- **Dotyczy:** `install.py` (start.bat/start.sh) + `backend/setup.py` (auto-install z UI)
+
+---
+
 ## Znane ograniczenia (NIE bugi)
 
 - Indeks RAG jest w pamięci (dokumenty zapisane na dysku, ale indeks przebudowywany po restarcie)

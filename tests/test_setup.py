@@ -3,7 +3,7 @@ import os
 from unittest.mock import patch, MagicMock
 import pytest
 
-from neurostudio.backend.setup import get_engine_status, _get_download_url, _download_file
+from neurostudio.backend.setup import get_engine_status, _get_download_url, _download_file, _strip_archive_ext
 
 
 class TestGetEngineStatus:
@@ -38,32 +38,115 @@ class TestGetEngineStatus:
         assert len(status["platform"]) > 0
 
 
+class TestStripArchiveExt:
+    def test_strip_zip(self):
+        assert _strip_archive_ext("file.zip") == "file"
+
+    def test_strip_tar_gz(self):
+        assert _strip_archive_ext("file.tar.gz") == "file"
+
+    def test_strip_tar_xz(self):
+        assert _strip_archive_ext("file.tar.xz") == "file"
+
+    def test_strip_tar_bz2(self):
+        assert _strip_archive_ext("file.tar.bz2") == "file"
+
+    def test_no_ext(self):
+        assert _strip_archive_ext("file") == "file"
+
+    def test_real_llama_filename_zip(self):
+        assert _strip_archive_ext("llama-b8117-bin-win-vulkan-x64.zip") == "llama-b8117-bin-win-vulkan-x64"
+
+    def test_real_llama_filename_targz(self):
+        assert _strip_archive_ext("llama-b8117-bin-ubuntu-vulkan-x64.tar.gz") == "llama-b8117-bin-ubuntu-vulkan-x64"
+
+
+def _mock_github_api(assets):
+    """Helper to mock GitHub API response with given assets."""
+    import json
+    mock_resp = MagicMock()
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    mock_resp.read.return_value = json.dumps({"assets": assets}).encode()
+    return mock_resp
+
+
 class TestGetDownloadUrl:
     @patch("neurostudio.backend.setup.urllib.request.urlopen")
     def test_returns_tuple(self, mock_urlopen):
-        # Mock GitHub API response
-        mock_resp = MagicMock()
-        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        mock_resp.read.return_value = b'{"assets": []}'
-        mock_urlopen.return_value = mock_resp
+        mock_urlopen.return_value = _mock_github_api([])
 
         url, filename = _get_download_url()
-        # With no matching assets, should return None
         assert url is None
         assert filename is None
 
     @patch("neurostudio.backend.setup.urllib.request.urlopen")
-    def test_finds_linux_asset(self, mock_urlopen):
-        mock_resp = MagicMock()
-        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        mock_resp.read.return_value = b'{"assets": [{"name": "llama-b1234-bin-ubuntu-x64.zip", "browser_download_url": "https://example.com/llama.zip"}]}'
-        mock_urlopen.return_value = mock_resp
-
+    def test_finds_linux_asset_zip(self, mock_urlopen):
+        mock_urlopen.return_value = _mock_github_api([
+            {"name": "llama-b1234-bin-ubuntu-x64.zip", "browser_download_url": "https://example.com/ubuntu.zip"}
+        ])
         with patch("neurostudio.backend.setup.platform.system", return_value="Linux"):
             url, filename = _get_download_url()
-            assert url == "https://example.com/llama.zip"
+            assert url == "https://example.com/ubuntu.zip"
+
+    @patch("neurostudio.backend.setup.urllib.request.urlopen")
+    def test_finds_linux_asset_targz(self, mock_urlopen):
+        mock_urlopen.return_value = _mock_github_api([
+            {"name": "llama-b8117-bin-ubuntu-vulkan-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu.tar.gz"}
+        ])
+        with patch("neurostudio.backend.setup.platform.system", return_value="Linux"):
+            url, filename = _get_download_url()
+            assert url == "https://example.com/ubuntu.tar.gz"
+
+    @patch("neurostudio.backend.setup.urllib.request.urlopen")
+    def test_windows_picks_win_not_ubuntu(self, mock_urlopen):
+        """Critical test: Windows must NOT match ubuntu-vulkan-x64."""
+        mock_urlopen.return_value = _mock_github_api([
+            {"name": "llama-b8117-bin-ubuntu-vulkan-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu.tar.gz"},
+            {"name": "llama-b8117-bin-win-vulkan-x64.zip", "browser_download_url": "https://example.com/win.zip"},
+        ])
+        with patch("neurostudio.backend.setup.platform.system", return_value="Windows"), \
+             patch("neurostudio.backend.setup.platform.machine", return_value="AMD64"):
+            url, filename = _get_download_url()
+            assert url == "https://example.com/win.zip"
+            assert "win" in filename.lower()
+
+    @patch("neurostudio.backend.setup.urllib.request.urlopen")
+    def test_windows_picks_win_even_if_ubuntu_first(self, mock_urlopen):
+        """Ubuntu asset listed first should NOT be picked on Windows."""
+        mock_urlopen.return_value = _mock_github_api([
+            {"name": "llama-b8117-bin-ubuntu-vulkan-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu.tar.gz"},
+            {"name": "llama-b8117-bin-win-vulkan-x64.zip", "browser_download_url": "https://example.com/win.zip"},
+        ])
+        with patch("neurostudio.backend.setup.platform.system", return_value="Windows"), \
+             patch("neurostudio.backend.setup.platform.machine", return_value="AMD64"):
+            url, filename = _get_download_url()
+            assert "ubuntu" not in url
+            assert "win" in url
+
+    @patch("neurostudio.backend.setup.urllib.request.urlopen")
+    def test_linux_picks_ubuntu_not_win(self, mock_urlopen):
+        """Linux must pick ubuntu, not win."""
+        mock_urlopen.return_value = _mock_github_api([
+            {"name": "llama-b8117-bin-win-vulkan-x64.zip", "browser_download_url": "https://example.com/win.zip"},
+            {"name": "llama-b8117-bin-ubuntu-vulkan-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu.tar.gz"},
+        ])
+        with patch("neurostudio.backend.setup.platform.system", return_value="Linux"), \
+             patch("neurostudio.backend.setup.platform.machine", return_value="x86_64"):
+            url, filename = _get_download_url()
+            assert "ubuntu" in url
+            assert "win" not in url
+
+    @patch("neurostudio.backend.setup.urllib.request.urlopen")
+    def test_macos_arm64(self, mock_urlopen):
+        mock_urlopen.return_value = _mock_github_api([
+            {"name": "llama-b8117-bin-macos-arm64.zip", "browser_download_url": "https://example.com/macos-arm64.zip"},
+            {"name": "llama-b8117-bin-macos-x64.zip", "browser_download_url": "https://example.com/macos-x64.zip"},
+        ])
+        with patch("neurostudio.backend.setup.platform.system", return_value="Darwin"), \
+             patch("neurostudio.backend.setup.platform.machine", return_value="arm64"):
+            url, filename = _get_download_url()
+            assert "arm64" in url
 
     @patch("neurostudio.backend.setup.urllib.request.urlopen", side_effect=Exception("Network error"))
     def test_returns_none_on_network_error(self, mock_urlopen):

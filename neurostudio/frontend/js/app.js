@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTemplates();
     loadRouterConfig();
     loadProviders();
+    loadAgentRoles();
     setupEventListeners();
     startMiniMonitor();
 });
@@ -1663,6 +1664,9 @@ function setupEventListeners() {
             e.target.value = '';
         }
     });
+
+    // Multi-Agent
+    $('btn-run-multiagent').addEventListener('click', runMultiAgent);
 }
 
 // ──── Utilities ────
@@ -1764,6 +1768,251 @@ function scrollToBottom() {
     });
 }
 
+// ──── Multi-Agent ────
+
+const ROLE_COLORS = {
+    planner: '#6c5ce7',
+    coder: '#00b894',
+    reviewer: '#fdcb6e',
+    researcher: '#74b9ff',
+};
+
+let _maWorkflowActive = false;
+
+async function loadAgentRoles() {
+    try {
+        const resp = await fetch('/api/agents/roles');
+        const data = await resp.json();
+        const container = $('ma-roles-list');
+        container.innerHTML = '';
+        for (const role of data.roles) {
+            const badge = document.createElement('span');
+            badge.className = 'ma-role-badge';
+            badge.title = role.description;
+            badge.innerHTML = `<span class="ma-role-dot" style="background:${role.color}"></span>${role.name}`;
+            container.appendChild(badge);
+        }
+    } catch (e) {
+        console.error('Failed to load agent roles:', e);
+    }
+}
+
+async function runMultiAgent() {
+    const taskInput = $('ma-task-input');
+    const task = taskInput.value.trim();
+    if (!task || _maWorkflowActive) return;
+
+    _maWorkflowActive = true;
+    const btn = $('btn-run-multiagent');
+    btn.disabled = true;
+    btn.textContent = 'Pracuje...';
+
+    const statusEl = $('ma-workflow-status');
+    statusEl.classList.remove('hidden');
+    $('ma-progress-fill').style.width = '0%';
+    $('ma-progress-text').textContent = 'Planowanie...';
+
+    // Show workflow panel in main area
+    showWorkflowPanel(task);
+
+    try {
+        const resp = await fetch('/api/agents/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task, session_id: state.sessionId }),
+        });
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const event = JSON.parse(line.slice(6));
+                        handleMultiAgentEvent(event);
+                    } catch (e) {
+                        // ignore parse errors
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Multi-agent error:', e);
+        $('ma-progress-text').textContent = 'Blad: ' + e.message;
+    }
+
+    _maWorkflowActive = false;
+    btn.disabled = false;
+    btn.textContent = '\u2699 Uruchom zespol agentow';
+}
+
+function handleMultiAgentEvent(event) {
+    switch (event.type) {
+        case 'workflow_start':
+            $('ma-progress-text').textContent = 'Workflow rozpoczety...';
+            break;
+
+        case 'planning':
+            $('ma-progress-text').textContent = event.status;
+            $('ma-progress-fill').style.width = '5%';
+            break;
+
+        case 'plan_ready':
+            renderWorkflowSubtasks(event.subtasks);
+            $('ma-progress-text').textContent = `Plan gotowy: ${event.subtasks.length} podzadan`;
+            $('ma-progress-fill').style.width = '10%';
+            break;
+
+        case 'subtask_start':
+            updateWorkflowSubtask(event.subtask.id, 'running', null);
+            $('ma-progress-text').textContent = `[${event.agent}] ${event.subtask.title}...`;
+            break;
+
+        case 'subtask_complete':
+            updateWorkflowSubtask(event.subtask_id, 'completed', event.result);
+            break;
+
+        case 'subtask_error':
+            updateWorkflowSubtask(event.subtask_id, 'failed', null, event.error);
+            break;
+
+        case 'progress_update':
+            if (event.progress) {
+                const pct = 10 + (event.progress.percent * 0.8); // 10-90% range for subtasks
+                $('ma-progress-fill').style.width = pct + '%';
+                $('ma-progress-text').textContent = `${event.progress.completed}/${event.progress.total} podzadan`;
+
+                // Update workflow progress summary
+                updateWorkflowProgress(event.progress);
+            }
+            break;
+
+        case 'synthesis':
+            $('ma-progress-text').textContent = event.status;
+            $('ma-progress-fill').style.width = '95%';
+            break;
+
+        case 'workflow_complete':
+            $('ma-progress-fill').style.width = '100%';
+            $('ma-progress-text').textContent = 'Gotowe!';
+            showWorkflowResult(event.result);
+
+            // Also inject result as assistant message in chat
+            appendWorkflowMessage(event.result);
+
+            setTimeout(() => {
+                $('ma-workflow-status').classList.add('hidden');
+            }, 3000);
+            break;
+
+        case 'workflow_error':
+            $('ma-progress-text').textContent = 'Blad: ' + event.message;
+            $('ma-progress-fill').style.width = '0%';
+            break;
+    }
+}
+
+// ──── Workflow Visualization ────
+
+function showWorkflowPanel(task) {
+    const panel = $('workflow-panel');
+    panel.classList.remove('hidden');
+    $('workflow-task').textContent = 'Zadanie: ' + task;
+    $('workflow-subtasks').innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">Planner analizuje zadanie...</div>';
+    $('workflow-result').classList.add('hidden');
+    $('workflow-progress').innerHTML = '';
+}
+
+function toggleWorkflowPanel() {
+    $('workflow-panel').classList.toggle('hidden');
+}
+
+function renderWorkflowSubtasks(subtasks) {
+    const container = $('workflow-subtasks');
+    container.innerHTML = '';
+
+    for (const st of subtasks) {
+        const el = document.createElement('div');
+        el.className = 'workflow-subtask';
+        el.id = `ws-subtask-${st.id}`;
+
+        const color = ROLE_COLORS[st.role] || '#6c5ce7';
+        el.innerHTML = `
+            <div class="ws-status-icon pending" id="ws-icon-${st.id}">\u23F3</div>
+            <div class="ws-details">
+                <div class="ws-title">
+                    ${escapeHtml(st.title)}
+                    <span class="ws-role-badge" style="background:${color}22;color:${color}">${st.role}</span>
+                </div>
+                <div class="ws-description">${escapeHtml(st.description || '')}</div>
+                <div id="ws-result-${st.id}"></div>
+            </div>
+        `;
+        container.appendChild(el);
+    }
+}
+
+function updateWorkflowSubtask(id, status, result, error) {
+    const icon = $(`ws-icon-${id}`);
+    if (icon) {
+        icon.className = `ws-status-icon ${status}`;
+        const icons = { pending: '\u23F3', running: '\u2699', completed: '\u2714', failed: '\u2718' };
+        icon.textContent = icons[status] || '\u23F3';
+    }
+
+    const resultEl = $(`ws-result-${id}`);
+    if (resultEl) {
+        if (status === 'completed' && result) {
+            resultEl.innerHTML = `<div class="ws-result">${escapeHtml(result)}</div>`;
+        } else if (status === 'failed' && error) {
+            resultEl.innerHTML = `<div class="ws-error">\u26A0 ${escapeHtml(error)}</div>`;
+        }
+    }
+}
+
+function updateWorkflowProgress(progress) {
+    const el = $('workflow-progress');
+    el.innerHTML = `
+        <span class="wp-stat">\u2714 ${progress.completed} gotowe</span>
+        <span class="wp-stat">\u2699 ${progress.running} w toku</span>
+        <span class="wp-stat">\u23F3 ${progress.pending} czeka</span>
+        ${progress.failed > 0 ? `<span class="wp-stat" style="color:var(--danger)">\u2718 ${progress.failed} nieudane</span>` : ''}
+    `;
+}
+
+function showWorkflowResult(result) {
+    const el = $('workflow-result');
+    el.classList.remove('hidden');
+    el.innerHTML = `
+        <h4>Wynik koncowy</h4>
+        <div class="workflow-result-content">${renderMarkdown(result)}</div>
+    `;
+}
+
+function appendWorkflowMessage(result) {
+    // Add workflow result as a special assistant message in the chat
+    const msgEl = document.createElement('div');
+    msgEl.className = 'message assistant';
+    msgEl.innerHTML = `
+        <div class="message-avatar">\u129302</div>
+        <div class="message-content">
+            <p><strong>Wynik pracy zespolu agentow:</strong></p>
+            <div>${renderMarkdown(result)}</div>
+        </div>
+    `;
+    chatMessages.appendChild(msgEl);
+    scrollToBottom();
+}
+
 // Expose for inline event handlers
 window.downloadModel = downloadModel;
 window.removeDocument = removeDocument;
@@ -1773,3 +2022,4 @@ window.testRouter = testRouter;
 window.copyCodeBlock = copyCodeBlock;
 window.exportConversation = exportConversation;
 window.deleteConversation = deleteConversation;
+window.toggleWorkflowPanel = toggleWorkflowPanel;

@@ -208,6 +208,22 @@
                 </div>
             </div>
 
+            <!-- Multi-Agent -->
+            <div class="sidebar-section collapsible">
+                <h3 class="section-toggle" data-target="multiagent-panel">Multi-Agent <span class="toggle-arrow">&#9660;</span></h3>
+                <div id="multiagent-panel" class="section-content">
+                    <p class="section-desc">Kilka agentow AI wspolpracuje nad zlozonym zadaniem.</p>
+                    <div class="ma-roles" id="ma-roles-list"></div>
+                    <textarea id="ma-task-input" class="ma-task-input" placeholder="Opisz zlozony problem do rozwiazania..." rows="3"></textarea>
+                    <button id="btn-run-multiagent" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">&#9881; Uruchom zespol agentow</button>
+                    <div id="ma-workflow-status" class="ma-workflow-status hidden">
+                        <div class="ma-progress-bar"><div id="ma-progress-fill" class="ma-progress-fill"></div></div>
+                        <div id="ma-progress-text" class="ma-progress-text">0%</div>
+                    </div>
+                    <div id="ma-workflows-history" class="ma-workflows-history"></div>
+                </div>
+            </div>
+
             <!-- Documents (RAG) -->
             <div class="sidebar-section collapsible">
                 <h3 class="section-toggle" data-target="documents-panel">Dokumenty (RAG) <span class="toggle-arrow">&#9660;</span></h3>
@@ -223,7 +239,7 @@
             <!-- System Info -->
             <div class="sidebar-section">
                 <div id="system-info" class="system-info">
-                    <small>NeuroForge v0.5.0</small>
+                    <small>NeuroForge v0.6.0</small>
                 </div>
             </div>
         </aside>
@@ -322,6 +338,18 @@
                 </div>
             </div>
 
+            <!-- Multi-Agent Workflow Panel (hidden by default) -->
+            <div id="workflow-panel" class="workflow-panel hidden">
+                <div class="workflow-header">
+                    <h3>Przeplyw pracy agentow</h3>
+                    <button class="btn btn-sm btn-ghost" onclick="toggleWorkflowPanel()">&times;</button>
+                </div>
+                <div id="workflow-task" class="workflow-task"></div>
+                <div id="workflow-progress" class="workflow-progress-summary"></div>
+                <div id="workflow-subtasks" class="workflow-subtasks"></div>
+                <div id="workflow-result" class="workflow-result hidden"></div>
+            </div>
+
             <!-- Chat Messages -->
             <div id="chat-messages" class="chat-messages">
                 <div class="welcome-message">
@@ -347,6 +375,10 @@
                         <div class="cap-item">
                             <span class="cap-icon">&#128196;</span>
                             <span>RAG</span>
+                        </div>
+                        <div class="cap-item">
+                            <span class="cap-icon">&#129302;</span>
+                            <span>Multi-Agent</span>
                         </div>
                     </div>
                     <p class="hint">Zaladuj model lub podlacz API, zeby zaczac.</p>

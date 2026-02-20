@@ -1,9 +1,9 @@
 # NeuroForge ML/AI - Handoff dla nowego AI
 
 ## TL;DR
-**NeuroForge Local AI Studio v0.5.0** - kompletna aplikacja do uruchamiania lokalnych LLM i zewnetrznych API AI na GPU AMD RX 9070 XT.
-FastAPI backend + vanilla JS frontend + llama.cpp inference + 6 providerow AI (OpenAI, Anthropic, Google, Ollama, OpenRouter).
-**Kod jest GOTOWY i KOMPLETNY** - ~55 plikow, ~10000 linii + 167 testow.
+**NeuroForge Local AI Studio v0.6.0** - kompletna aplikacja do uruchamiania lokalnych LLM i zewnetrznych API AI na GPU AMD RX 9070 XT.
+FastAPI backend + vanilla JS frontend + llama.cpp inference + 6 providerow AI + system multi-agent.
+**Kod jest GOTOWY i KOMPLETNY** - ~60 plikow, ~12000 linii + 221 testow.
 
 ---
 
@@ -45,19 +45,32 @@ ML-AI/
     ├── models/                        # Tu trafiają pliki .gguf
     ├── data/                          # Konwersacje, dokumenty, indeks RAG
     ├── backend/
-    │   ├── app.py                     # FastAPI - 20+ endpointów + 2 WebSockety (466 linii)
+    │   ├── app.py                     # FastAPI - 40+ endpointów + 3 WebSockety (870+ linii)
     │   ├── config.py                  # Zarządzanie config.yaml (49 linii)
-    │   ├── storage.py                 # Persystencja konwersacji JSON (94 linii)
-    │   ├── monitor.py                 # Monitor CPU/RAM/GPU - AMD + NVIDIA (184 linii)
+    │   ├── storage.py                 # Persystencja konwersacji JSON (191 linii)
+    │   ├── usage.py                   # Śledzenie tokenów/kosztów per provider (151 linii)
+    │   ├── monitor.py                 # Monitor CPU/RAM/GPU - AMD + NVIDIA (194 linii)
+    │   ├── setup.py                   # Auto-download llama.cpp binary (218 linii)
     │   ├── templates.py               # 12 wbudowanych szablonów promptów PL (171 linii)
     │   ├── inference/
+    │   │   ├── __init__.py            # Rejestracja providerów przy imporcie
     │   │   ├── engine.py              # Zarządzanie procesem llama.cpp (191 linii)
     │   │   ├── model_manager.py       # Odkrywanie i pobieranie modeli GGUF (160 linii)
-    │   │   └── router.py             # Routing modeli wg typu zadania (81 linii)
+    │   │   ├── router.py              # Routing modeli wg typu zadania (81 linii)
+    │   │   ├── providers.py           # BaseProvider ABC + ProviderRegistry (222 linii)
+    │   │   ├── provider_local.py      # Wrapper na llama.cpp engine
+    │   │   ├── provider_openai.py     # OpenAI API (GPT-4o, GPT-4.1)
+    │   │   ├── provider_anthropic.py  # Anthropic API (Claude Opus/Sonnet/Haiku)
+    │   │   ├── provider_google.py     # Google Gemini API
+    │   │   ├── provider_ollama.py     # Lokalna instancja Ollama
+    │   │   └── provider_openrouter.py # OpenRouter (100+ modeli)
     │   ├── agent/
-    │   │   └── loop.py                # Pętla agenta z narzędziami (173 linii)
+    │   │   ├── loop.py                # Pętla agenta z narzędziami (275 linii)
+    │   │   ├── roles.py               # [v0.6] Role agentów: planner/coder/reviewer/researcher
+    │   │   ├── shared_context.py      # [v0.6] Pamięć współdzielona, message passing, artefakty
+    │   │   └── orchestrator.py        # [v0.6] Orkiestrator multi-agent z równoległym wykonywaniem
     │   ├── rag/
-    │   │   └── engine.py              # Silnik TF-IDF RAG (276 linii)
+    │   │   └── engine.py              # Silnik TF-IDF RAG (307 linii)
     │   └── tools/
     │       ├── base.py                # Klasa bazowa + rejestr narzędzi (71 linii)
     │       ├── filesystem.py          # Odczyt/zapis/szukanie plików (244 linii)
@@ -67,9 +80,9 @@ ML-AI/
     │       ├── shell.py               # Komendy systemowe + procesy (162 linii)
     │       └── rag_search.py          # Wyszukiwanie w dokumentach RAG (52 linii)
     └── frontend/
-        ├── index.html                 # Interfejs UI (226 linii)
-        ├── css/style.css              # Dark theme, responsive (1075 linii)
-        └── js/app.js                  # WebSocket + logika UI (861 linii)
+        ├── index.html                 # Interfejs UI (400+ linii)
+        ├── css/style.css              # Dark theme, responsive (2000+ linii)
+        └── js/app.js                  # WebSocket + logika UI (1900+ linii)
 ```
 
 ---
@@ -77,7 +90,7 @@ ML-AI/
 ## Co jest GOTOWE (100%)
 
 ### Backend
-- **FastAPI app** z 35+ REST endpointami + 2 WebSockety (chat + monitor)
+- **FastAPI app** z 40+ REST endpointami + 3 WebSockety (chat + monitor + multi-agent)
 - **Inference engine** - zarzadzanie procesem llama-server (start/stop/health check)
 - **Model manager** - 13 rekomendowanych modeli z kategoriami, pobieranie z HuggingFace z prawdziwym postepem (SSE)
 - **Agent loop** - petla rozumowania z wywolaniami narzedzi, streaming eventow, fallback chain
@@ -91,6 +104,12 @@ ML-AI/
 - **Monitor** - CPU/RAM/dysk/GPU (AMD rocm-smi + NVIDIA nvidia-smi)
 - **12 szablonow promptow** po polsku (code review, testy, tlumaczenia, refaktoring...)
 - **Auto-setup** - instalacja llama-server z poziomu UI (bez recznego uruchamiania install.py)
+- **Multi-Agent System** (v0.6):
+  - **Orkiestrator** - koordynacja podzadan, rownolegle wykonywanie, fallback na awarie
+  - **4 role agentow:** Planner (planowanie), Coder (kodowanie), Reviewer (recenzja), Researcher (badania)
+  - **Shared Context** - pamiec wspoldzielona, message passing miedzy agentami, artefakty
+  - **Planner-driven decomposition** - automatyczny podzial zlozonych zadan na podzadania z zaleznosциami
+  - **Per-role tool filtering** - kazda rola ma dostep tylko do swoich narzedzi
 
 ### Frontend
 - **Dark theme** z fioletowym akcentem (#6c5ce7)
@@ -104,6 +123,8 @@ ML-AI/
 - **Status bar** aktywnego providera z zuzyciem tokenow i kosztem
 - **Panel szablonow** z kategoriami (coding, text, tools)
 - **Monitor systemowy** z auto-odswiezaniem co 2s
+- **Panel Multi-Agent** - uruchamianie zespolu agentow, wizualizacja przeplywu pracy
+- **Workflow visualization** - real-time widok podzadan, statusy, wyniki agentow
 - **Responsywny** - dziala na mobile
 
 ### Instalacja
@@ -193,6 +214,13 @@ ML-AI/
 - `POST /api/templates` - utworz wlasny
 - `DELETE /api/templates/{id}` - usun
 
+### Multi-Agent (v0.6)
+- `GET /api/agents/roles` - lista dostepnych rol agentow
+- `POST /api/agents/run` - uruchom workflow multi-agent (SSE stream z eventami)
+- `GET /api/agents/workflows` - lista aktywnych/zakonczonych workflows
+- `GET /api/agents/workflows/{id}` - szczegoly workflow (podzadania, wiadomosci, artefakty)
+- `WS /ws/agents` - WebSocket do real-time multi-agent (alternatywa dla SSE)
+
 ### Pliki i konfiguracja
 - `POST /api/upload` - upload pliku do chatu (max 50MB)
 - `GET /api/config` - pobierz konfiguracje
@@ -228,6 +256,85 @@ ML-AI/
 4. **WebSocket** dla chatu - streaming tokenów w real-time
 5. **DuckDuckGo** zamiast Google/Bing - bez klucza API
 6. **JSON file storage** zamiast SQLite - prostota, czytelność
+
+---
+
+## Architektura Multi-Agent (v0.6)
+
+### Przeplyw workflow (3 fazy)
+
+```
+Uzytkownik: "Przeanalizuj ten kod i popraw bledy"
+         │
+    ┌────▼────┐
+    │ PLANNER  │  Faza 1: Planowanie
+    │          │  - Analizuje zadanie
+    │  JSON:   │  - Generuje liste podzadan
+    │ subtasks │  - Przypisuje role i zaleznosci
+    └────┬─────┘
+         │
+    ┌────▼────────────────────────────┐
+    │    ORCHESTRATOR (Faza 2)        │
+    │                                 │
+    │  Dependency graph:              │
+    │  [1] Research (researcher) ──┐  │
+    │  [2] Code fix (coder) ◄──────┤  │
+    │  [3] Review (reviewer) ◄─────┘  │
+    │                                 │
+    │  Parallel: [1] runs alone       │
+    │  Then: [2] after [1] completes  │
+    │  Then: [3] after [2] completes  │
+    └────┬────────────────────────────┘
+         │
+    ┌────▼────┐
+    │ SYNTH.  │  Faza 3: Synteza
+    │         │  - Laczy wyniki agentow
+    │  Final  │  - Tworzy spojna odpowiedz
+    │ response│  - Wysyla do uzytkownika
+    └─────────┘
+```
+
+### Role agentow
+
+| Rola | Narzedzia | Kolor | Cel |
+|------|-----------|-------|-----|
+| **Planner** | brak | #6c5ce7 | Analizuje zadanie, tworzy plan JSON z podzadaniami |
+| **Coder** | read_file, execute_code, run_command, search_documents | #00b894 | Pisze/debuguje kod, uzywa narzedzi |
+| **Reviewer** | read_file, search_documents | #fdcb6e | Recenzuje kod (read-only), szuka bledow |
+| **Researcher** | web_search, web_fetch, search_documents, read_file | #74b9ff | Zbiera informacje z internetu i dokumentow |
+
+### Shared Context (pamiec wspoldzielona)
+
+Kazdy workflow ma wlasna instancje `SharedContext` zawierajaca:
+- **Subtasks** - lista podzadan ze statusami (pending/running/completed/failed/skipped)
+- **Messages** - log wiadomosci miedzy agentami (typed: TASK, RESULT, QUESTION, INFO, ERROR)
+- **Artifacts** - named storage na dane produkowane przez agentow (kod, wyniki, dokumenty)
+- **Context Summary** - automatycznie budowany kontekst dla kazdego agenta (wyniki poprzednikow + wiadomosci)
+
+### Eventy SSE (Server-Sent Events)
+
+Workflow emituje real-time eventy przez SSE/WebSocket:
+
+```
+workflow_start  → {workflow_id, task}
+planning        → {status: "Planner analizuje..."}
+plan_ready      → {subtasks: [{id, title, role, description, depends_on}]}
+subtask_start   → {subtask: {...}, agent: "coder"}
+subtask_complete → {subtask_id, result}
+subtask_error   → {subtask_id, error}
+progress_update → {progress: {total, completed, failed, running, pending, percent}}
+synthesis       → {status: "Lacze wyniki..."}
+workflow_complete → {workflow_id, result, progress}
+workflow_error  → {message}
+```
+
+### Pliki modulu multi-agent
+
+| Plik | Klasy/Funkcje | Rozmiar |
+|------|---------------|---------|
+| `agent/roles.py` | AgentRole, PLANNER/CODER/REVIEWER/RESEARCHER, get_role(), list_roles() | ~120 linii |
+| `agent/shared_context.py` | SharedContext, Subtask, AgentMessage, MessageType, SubtaskStatus | ~200 linii |
+| `agent/orchestrator.py` | MultiAgentOrchestrator.run_workflow(), _run_planner(), _run_subtask(), _synthesize() | ~250 linii |
 
 ---
 
@@ -292,7 +399,7 @@ ML-AI/
 - [x] **Usage tracking** - tokeny/koszty per provider z szacunkami cen
 - [x] **Testy:** 58 testow (36 providers + 22 usage tracking)
 
-### v0.5 - Hybrid Mode + UX (GOTOWE - aktualny stan)
+### v0.5 - Hybrid Mode + UX (GOTOWE)
 > Tryb hybrydowy, lepszy UX, nowe funkcje.
 
 - [x] **Fallback chain** - automatyczne przelaczanie na zapasowego providera
@@ -308,16 +415,22 @@ ML-AI/
 - [x] **Karta aktywnego providera** - info + przycisk dezaktywacji
 - [x] **Testy:** 167 testow razem
 
-### v0.6 - Multi-Agent (DO ZROBIENIA)
+### v0.6 - Multi-Agent (GOTOWE - aktualny stan)
 > Kilka agentow AI wspolpracuje nad zlozonym zadaniem.
 
-- [ ] Orkiestrator agentow - koordynacja zadan miedzy agentami
-- [ ] Role agentow (planer, coder, reviewer, researcher)
-- [ ] Komunikacja miedzy agentami (message passing)
-- [ ] Kazdy agent moze uzywac innego modelu/providera (lokalne + chmurowe)
-- [ ] UI: wizualizacja przeplywu pracy agentow
-- [ ] Rownolegle wykonywanie podzadan
-- [ ] Shared context / pamiec wspoldzielona miedzy agentami
+- [x] **Orkiestrator agentow** - 3-fazowy workflow: Planning → Execution → Synthesis
+- [x] **4 role agentow:** Planner (planowanie), Coder (kod), Reviewer (recenzja), Researcher (badania)
+- [x] **Komunikacja miedzy agentami** - typed message passing (TASK, RESULT, QUESTION, INFO, ERROR)
+- [x] **Shared context** - pamiec wspoldzielona, artefakty, context summary per agent
+- [x] **Per-role tool filtering** - kazda rola ma dostep tylko do swoich narzedzi (np. Reviewer = read-only)
+- [x] **Rownolegle wykonywanie** - podzadania bez zaleznosci wykonuja sie jednoczesnie (asyncio.gather)
+- [x] **Dependency graph** - podzadania z depends_on, automatyczne schedulowanie
+- [x] **Preferred provider per role** - kazdy agent moze uzywac innego modelu/providera
+- [x] **UI: panel Multi-Agent** w sidebarze - opis zadania, uruchomienie zespolu, pasek postepu
+- [x] **UI: workflow visualization** - floating panel z real-time widokiem podzadan i wynikow
+- [x] **API:** GET /api/agents/roles, POST /api/agents/run (SSE), GET /api/agents/workflows
+- [x] **WebSocket:** WS /ws/agents - real-time workflow events
+- [x] **Testy:** 54 nowe testy (role, shared context, orchestrator) = 221 testow razem
 
 ### v0.7 - Vision (DO ZROBIENIA)
 > Analiza obrazow i screenshotow przez modele multimodalne.

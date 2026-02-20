@@ -23,6 +23,8 @@ from .inference.model_manager import (
     list_models, get_model_path, download_model, get_recommended_models
 )
 from .agent.loop import agent
+from .agent.orchestrator import orchestrator
+from .agent.roles import list_roles_dict
 from .inference.router import (
     get_router_config, update_router_config, detect_task_type, get_task_scores
 )
@@ -53,7 +55,7 @@ async def lifespan(app: FastAPI):
     await engine.stop()
 
 
-app = FastAPI(title="NeuroForge", version="0.5.0", lifespan=lifespan)
+app = FastAPI(title="NeuroForge", version="0.6.0", lifespan=lifespan)
 
 # Mount static files
 app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
@@ -775,3 +777,80 @@ async def api_list_uploads():
             })
     files.sort(key=lambda x: x["filename"])
     return {"files": files}
+
+
+# ──────────────────────── Multi-Agent ────────────────────────
+
+@app.get("/api/agents/roles")
+async def api_list_roles():
+    """List all available agent roles."""
+    return {"roles": list_roles_dict()}
+
+
+class MultiAgentRequest(BaseModel):
+    task: str
+    session_id: str | None = None
+
+
+@app.post("/api/agents/run")
+async def api_run_multi_agent(req: MultiAgentRequest):
+    """Run a multi-agent workflow (SSE stream for real-time events)."""
+    session_id = req.session_id or str(uuid.uuid4())
+
+    async def event_stream():
+        async for event in orchestrator.run_workflow(req.task, session_id):
+            yield f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/api/agents/workflows")
+async def api_list_workflows():
+    """List all active/completed workflows."""
+    return {"workflows": orchestrator.list_workflows()}
+
+
+@app.get("/api/agents/workflows/{workflow_id}")
+async def api_get_workflow(workflow_id: str):
+    """Get workflow details including subtasks, messages, artifacts."""
+    ctx = orchestrator.get_workflow(workflow_id)
+    if not ctx:
+        raise HTTPException(404, "Workflow not found")
+    return ctx.to_dict()
+
+
+@app.websocket("/ws/agents")
+async def ws_multi_agent(ws: WebSocket):
+    """WebSocket endpoint for real-time multi-agent workflow execution."""
+    await ws.accept()
+
+    try:
+        while True:
+            data = await ws.receive_json()
+            msg_type = data.get("type")
+
+            if msg_type == "run":
+                task = data.get("task", "")
+                session_id = data.get("session_id", str(uuid.uuid4()))
+
+                if not task.strip():
+                    await ws.send_json({"type": "error", "message": "Puste zadanie"})
+                    continue
+
+                async for event in orchestrator.run_workflow(task, session_id):
+                    await ws.send_json(event)
+
+            elif msg_type == "list_workflows":
+                await ws.send_json({
+                    "type": "workflows",
+                    "workflows": orchestrator.list_workflows(),
+                })
+
+    except WebSocketDisconnect:
+        logger.info("Multi-agent WS disconnected")
+    except Exception as e:
+        logger.error("Multi-agent WS error: %s", e)
+        try:
+            await ws.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass

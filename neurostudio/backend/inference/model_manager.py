@@ -212,21 +212,75 @@ def get_model_path(filename: str) -> str | None:
 
 
 async def download_model(repo: str, filename: str, progress_callback=None) -> str:
-    """Download a model from HuggingFace Hub."""
+    """Download a model from HuggingFace Hub.
+
+    Args:
+        repo: HuggingFace repo id (e.g. "Qwen/Qwen2.5-7B-Instruct-GGUF")
+        filename: Model filename (e.g. "qwen2.5-7b-instruct-q4_k_m.gguf")
+        progress_callback: optional callable(downloaded_bytes, total_bytes)
+            called during download to report progress.
+    """
+    import asyncio
     from huggingface_hub import hf_hub_download
 
     models_dir = get_models_dir()
     logger.info("Downloading %s from %s...", filename, repo)
 
-    path = hf_hub_download(
+    tqdm_cls = None
+    if progress_callback:
+        tqdm_cls = _make_progress_tqdm(progress_callback)
+
+    path = await asyncio.to_thread(
+        hf_hub_download,
         repo_id=repo,
         filename=filename,
         local_dir=str(models_dir),
         local_dir_use_symlinks=False,
+        tqdm_class=tqdm_cls,
     )
 
     logger.info("Model downloaded to: %s", path)
     return path
+
+
+def _make_progress_tqdm(callback):
+    """Create a custom tqdm-compatible class that calls a progress callback."""
+
+    class ProgressTqdm:
+        """Minimal tqdm-compatible wrapper that reports progress via callback."""
+
+        def __init__(self, *args, **kwargs):
+            self.total = kwargs.get("total", 0)
+            self.n = kwargs.get("initial", 0)
+            self.desc = kwargs.get("desc", "")
+            self.unit = kwargs.get("unit", "it")
+
+        def update(self, n=1):
+            self.n += n
+            try:
+                callback(self.n, self.total)
+            except Exception:
+                pass
+
+        def close(self):
+            pass
+
+        def set_description(self, desc):
+            self.desc = desc
+
+        def set_postfix(self, *args, **kwargs):
+            pass
+
+        def refresh(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.close()
+
+    return ProgressTqdm
 
 
 def get_recommended_models() -> list[dict]:

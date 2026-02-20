@@ -261,3 +261,112 @@ class TestGlobalRegistry:
         """Default active provider should be 'local'."""
         assert provider_registry.active_provider is not None
         assert provider_registry.active_provider.provider_id == "local"
+
+
+class TestFallbackChain:
+    def test_empty_chain_by_default(self):
+        registry = ProviderRegistry()
+        assert registry.fallback_chain == []
+
+    def test_set_fallback_chain(self):
+        registry = ProviderRegistry()
+        registry.register(LocalProvider())
+        registry.register(OpenAIProvider({"api_key": "sk-test"}))
+        registry.set_fallback_chain(["openai", "local"])
+        assert registry.fallback_chain == ["openai", "local"]
+
+    def test_set_fallback_chain_filters_unknown(self):
+        registry = ProviderRegistry()
+        registry.register(LocalProvider())
+        registry.set_fallback_chain(["nonexistent", "local"])
+        assert registry.fallback_chain == ["local"]
+
+    def test_get_fallback_providers_excludes_active(self):
+        registry = ProviderRegistry()
+        registry.register(LocalProvider())
+        oai = OpenAIProvider({"api_key": "sk-test"})
+        registry.register(oai)
+        registry.set_active("openai")
+        registry.set_fallback_chain(["openai", "local"])
+        fallbacks = registry.get_fallback_providers()
+        ids = [p.provider_id for p in fallbacks]
+        assert "openai" not in ids
+        assert "local" in ids
+
+    def test_get_fallback_providers_empty_when_no_chain(self):
+        registry = ProviderRegistry()
+        registry.register(LocalProvider())
+        assert registry.get_fallback_providers() == []
+
+    def test_to_dict_includes_fallback_chain(self):
+        registry = ProviderRegistry()
+        registry.register(LocalProvider())
+        registry.set_active("local")
+        registry.set_fallback_chain(["local"])
+        data = registry.to_dict()
+        assert "fallback_chain" in data
+        assert data["fallback_chain"] == ["local"]
+
+
+class TestSmartRouting:
+    def test_disabled_by_default(self):
+        registry = ProviderRegistry()
+        assert registry.smart_routing is False
+
+    def test_enable_smart_routing(self):
+        registry = ProviderRegistry()
+        registry.set_smart_routing(True)
+        assert registry.smart_routing is True
+
+    def test_route_message_returns_active_when_disabled(self):
+        registry = ProviderRegistry()
+        registry.register(LocalProvider())
+        registry.set_active("local")
+        result = registry.route_message("hello")
+        assert result.provider_id == "local"
+
+    def test_route_simple_to_local_when_enabled(self):
+        registry = ProviderRegistry()
+        local = LocalProvider()
+        oai = OpenAIProvider({"api_key": "sk-test"})
+        registry.register(local)
+        registry.register(oai)
+        registry.set_active("openai")
+        registry.set_smart_routing(True)
+
+        # Short simple message should route to local (if available)
+        result = registry.route_message("Czesc, jak sie masz?")
+        assert result.provider_id == "local"
+
+    def test_route_complex_to_cloud_when_enabled(self):
+        registry = ProviderRegistry()
+        local = LocalProvider()
+        oai = OpenAIProvider({"api_key": "sk-test"})
+        registry.register(local)
+        registry.register(oai)
+        registry.set_active("openai")
+        registry.set_smart_routing(True)
+
+        # Long message with code markers should go to cloud
+        result = registry.route_message("Napisz mi funkcje Python ```def calculate_fibonacci(n): ...")
+        assert result.provider_id == "openai"
+
+    def test_route_falls_back_to_cloud_when_local_unavailable(self):
+        registry = ProviderRegistry()
+        oai = OpenAIProvider({"api_key": "sk-test"})
+        registry.register(oai)
+        registry.set_active("openai")
+        registry.set_smart_routing(True)
+
+        # No local provider registered - should use cloud even for simple
+        result = registry.route_message("Hi")
+        assert result.provider_id == "openai"
+
+    def test_to_dict_includes_smart_routing(self):
+        registry = ProviderRegistry()
+        registry.register(LocalProvider())
+        registry.set_active("local")
+        registry.set_smart_routing(True)
+        data = registry.to_dict()
+        assert "smart_routing" in data
+        assert data["smart_routing"] is True

@@ -100,7 +100,11 @@ function handleWSMessage(data) {
             break;
 
         case 'provider_info':
-            appendProviderInfo(data.provider, data.model);
+            appendProviderInfo(data.provider, data.model, data.routed);
+            break;
+
+        case 'fallback':
+            appendFallbackNotice(data.from, data.to);
             break;
 
         case 'usage_update':
@@ -246,10 +250,19 @@ function appendModelSwitch(fromModel, toModel) {
     scrollToBottom();
 }
 
-function appendProviderInfo(providerName, model) {
+function appendProviderInfo(providerName, model, routed) {
     const el = document.createElement('div');
     el.className = 'model-switch';
-    el.innerHTML = `<span class="provider-badge cloud">${escapeHtml(providerName)}</span> ${model ? escapeHtml(model) : ''}`;
+    const routedTag = routed ? ' <small style="opacity:0.6">(smart routing)</small>' : '';
+    el.innerHTML = `<span class="provider-badge cloud">${escapeHtml(providerName)}</span> ${model ? escapeHtml(model) : ''}${routedTag}`;
+    chatMessages.appendChild(el);
+    scrollToBottom();
+}
+
+function appendFallbackNotice(fromProvider, toProvider) {
+    const el = document.createElement('div');
+    el.className = 'model-switch';
+    el.innerHTML = `<span class="provider-badge" style="background:var(--warning);color:#333">Fallback</span> ${escapeHtml(fromProvider)} &rarr; ${escapeHtml(toProvider)}`;
     chatMessages.appendChild(el);
     scrollToBottom();
 }
@@ -465,51 +478,80 @@ async function downloadModelWithProgress(repo, filename, btn, card) {
     if (progressEl) progressEl.classList.remove('hidden');
 
     const startTime = Date.now();
-    let pollInterval = null;
+    let fill, pctEl, speedEl, etaEl;
+    if (progressEl) {
+        fill = progressEl.querySelector('.dl-progress-fill');
+        pctEl = progressEl.querySelector('.dl-progress-pct');
+        speedEl = progressEl.querySelector('.dl-progress-speed');
+        etaEl = progressEl.querySelector('.dl-progress-eta');
+    }
 
     try {
-        // Start download
-        const respPromise = fetch('/api/models/download', {
+        const resp = await fetch('/api/models/download', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ repo, filename }),
         });
 
-        // Poll for progress
-        if (progressEl) {
-            const fill = progressEl.querySelector('.dl-progress-fill');
-            const pctEl = progressEl.querySelector('.dl-progress-pct');
-            const speedEl = progressEl.querySelector('.dl-progress-speed');
-            const etaEl = progressEl.querySelector('.dl-progress-eta');
-
-            let fakeProgress = 0;
-            pollInterval = setInterval(() => {
-                const elapsed = (Date.now() - startTime) / 1000;
-                // Smooth fake progress (asymptotic approach to 95%)
-                fakeProgress = 95 * (1 - Math.exp(-elapsed / 60));
-                const pct = Math.round(fakeProgress);
-                fill.style.width = pct + '%';
-                pctEl.textContent = pct + '%';
-
-                if (elapsed > 5) {
-                    const mins = Math.floor(elapsed / 60);
-                    const secs = Math.floor(elapsed % 60);
-                    etaEl.textContent = `${mins}m ${secs}s`;
-                }
-            }, 500);
+        if (!resp.ok) {
+            const data = await resp.json();
+            throw new Error(data.detail || 'Pobieranie nie powiodlo sie');
         }
 
-        const resp = await respPromise;
+        // Read SSE stream for real progress
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let success = false;
 
-        if (pollInterval) clearInterval(pollInterval);
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-        if (resp.ok) {
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Keep incomplete line
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                let event;
+                try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+                if (event.type === 'progress' && progressEl) {
+                    fill.style.width = event.pct + '%';
+                    pctEl.textContent = Math.round(event.pct) + '%';
+
+                    // Speed in MB/s
+                    if (event.speed > 0) {
+                        speedEl.textContent = event.speed.toFixed(1) + ' MB/s';
+                    }
+
+                    // ETA
+                    if (event.eta > 0) {
+                        const mins = Math.floor(event.eta / 60);
+                        const secs = Math.floor(event.eta % 60);
+                        etaEl.textContent = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+                    }
+
+                    // Size info
+                    if (event.total > 0) {
+                        const dlMB = (event.downloaded / (1024*1024)).toFixed(0);
+                        const totalMB = (event.total / (1024*1024)).toFixed(0);
+                        btn.textContent = `${dlMB}/${totalMB} MB`;
+                    }
+                } else if (event.type === 'done') {
+                    success = true;
+                } else if (event.type === 'error') {
+                    throw new Error(event.message || 'Pobieranie nie powiodlo sie');
+                }
+            }
+        }
+
+        if (success) {
             if (progressEl) {
-                const fill = progressEl.querySelector('.dl-progress-fill');
-                const pctEl = progressEl.querySelector('.dl-progress-pct');
-                const etaEl = progressEl.querySelector('.dl-progress-eta');
                 fill.style.width = '100%';
                 pctEl.textContent = '100%';
+                speedEl.textContent = '';
                 const totalSec = Math.round((Date.now() - startTime) / 1000);
                 const mins = Math.floor(totalSec / 60);
                 const secs = totalSec % 60;
@@ -519,15 +561,15 @@ async function downloadModelWithProgress(repo, filename, btn, card) {
             btn.className = 'downloaded';
             btn.disabled = true;
             loadModels();
-        } else {
-            const data = await resp.json();
-            btn.textContent = 'Blad!';
-            btn.disabled = false;
-            alert('Blad pobierania: ' + (data.detail || 'unknown'));
         }
     } catch (e) {
-        if (pollInterval) clearInterval(pollInterval);
-        btn.textContent = 'Blad!';
+        if (progressEl) {
+            fill.style.width = '0%';
+            pctEl.textContent = 'Blad';
+            speedEl.textContent = '';
+            etaEl.textContent = '';
+        }
+        btn.textContent = 'Ponow';
         btn.disabled = false;
         alert('Blad pobierania: ' + e.message);
     }
@@ -976,6 +1018,7 @@ async function loadProviders() {
         updateActiveProviderCard(_providersData);
         renderProviderKeysGrid(_providersData);
         renderApiKeysForms(_providersData);
+        renderFallbackChain(_providersData);
         updateProviderBar(_providersData);
     } catch (e) {
         console.error('Failed to load providers:', e);
@@ -1054,6 +1097,86 @@ async function deactivateProvider() {
         }
     } catch (e) {
         alert('Blad polaczenia');
+    }
+}
+
+// ──── Fallback Chain & Smart Routing ────
+
+function renderFallbackChain(data) {
+    const list = $('fallback-chain-list');
+    const chain = data.fallback_chain || [];
+    list.innerHTML = '';
+
+    if (chain.length === 0) {
+        list.innerHTML = '<small style="color:var(--text-muted)">Brak - uzywa tylko aktywnego providera</small>';
+    } else {
+        chain.forEach((pid, i) => {
+            const provider = data.providers.find(p => p.id === pid);
+            const name = provider ? provider.name : pid;
+            const chip = document.createElement('span');
+            chip.className = 'fallback-chip';
+            chip.innerHTML = `<span class="fallback-order">${i + 1}.</span> ${name} <span class="fallback-remove" data-pid="${pid}">&times;</span>`;
+            list.appendChild(chip);
+        });
+    }
+
+    // Populate add-select with providers not yet in chain
+    const addSelect = $('fallback-add-select');
+    addSelect.innerHTML = '<option value="">+ Dodaj provider do lancucha</option>';
+    for (const p of data.providers) {
+        if (p.id === 'local') continue;  // local is always implicit fallback
+        if (chain.includes(p.id)) continue;
+        if (!p.has_api_key && p.requires_api_key) continue;
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        addSelect.appendChild(opt);
+    }
+
+    // Smart routing toggle
+    const toggle = $('smart-routing-toggle');
+    toggle.checked = data.smart_routing || false;
+}
+
+async function addToFallbackChain(providerId) {
+    if (!providerId || !_providersData) return;
+    const chain = (_providersData.fallback_chain || []).concat(providerId);
+    try {
+        const resp = await fetch('/api/providers/fallback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chain }),
+        });
+        if (resp.ok) await loadProviders();
+    } catch (e) {
+        console.error('Failed to update fallback chain:', e);
+    }
+}
+
+async function removeFromFallbackChain(providerId) {
+    if (!_providersData) return;
+    const chain = (_providersData.fallback_chain || []).filter(id => id !== providerId);
+    try {
+        const resp = await fetch('/api/providers/fallback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chain }),
+        });
+        if (resp.ok) await loadProviders();
+    } catch (e) {
+        console.error('Failed to update fallback chain:', e);
+    }
+}
+
+async function toggleSmartRouting(enabled) {
+    try {
+        await fetch('/api/providers/smart-routing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+        });
+    } catch (e) {
+        console.error('Failed to toggle smart routing:', e);
     }
 }
 
@@ -1471,6 +1594,23 @@ function setupEventListeners() {
     $('btn-activate-provider').addEventListener('click', activateProvider);
     $('btn-deactivate-provider').addEventListener('click', deactivateProvider);
 
+    // Fallback chain
+    $('fallback-add-select').addEventListener('change', (e) => {
+        if (e.target.value) {
+            addToFallbackChain(e.target.value);
+            e.target.value = '';
+        }
+    });
+    $('fallback-chain-list').addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.fallback-remove');
+        if (removeBtn) removeFromFallbackChain(removeBtn.dataset.pid);
+    });
+
+    // Smart routing
+    $('smart-routing-toggle').addEventListener('change', (e) => {
+        toggleSmartRouting(e.target.checked);
+    });
+
     // Download category filters
     document.querySelectorAll('.dl-cat').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1524,16 +1664,34 @@ function escapeHtml(text) {
 }
 
 function renderMarkdown(text) {
-    // Simple markdown rendering
+    // Simple markdown rendering with syntax highlighting
     let html = escapeHtml(text);
 
-    // Code blocks ```...```
+    // Code blocks ```lang...``` with syntax highlighting
     html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
-        return `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`;
+        const trimmed = code.trim();
+        let highlighted;
+        if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+            try {
+                highlighted = hljs.highlight(trimmed, { language: lang }).value;
+            } catch {
+                highlighted = trimmed;
+            }
+        } else if (typeof hljs !== 'undefined') {
+            try {
+                highlighted = hljs.highlightAuto(trimmed).value;
+            } catch {
+                highlighted = trimmed;
+            }
+        } else {
+            highlighted = trimmed;
+        }
+        const langLabel = lang ? `<span class="code-lang-label">${lang}</span>` : '';
+        return `<div class="code-block-wrapper">${langLabel}<pre><code class="hljs lang-${lang}">${highlighted}</code></pre></div>`;
     });
 
     // Inline code `...`
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
 
     // Bold **...**
     html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');

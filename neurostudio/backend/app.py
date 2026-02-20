@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from .config import load_config, save_config, get_models_dir, BASE_DIR
@@ -141,12 +141,69 @@ class ModelDownloadRequest(BaseModel):
 
 @app.post("/api/models/download")
 async def api_download_model(req: ModelDownloadRequest):
-    """Download a model from HuggingFace."""
+    """Download a model from HuggingFace with real-time progress via SSE."""
+    import asyncio
+    import time
+
+    queue: asyncio.Queue = asyncio.Queue()
+    start_time = time.time()
+    last_report = {"time": start_time, "bytes": 0}
+
+    def progress_callback(downloaded: int, total: int):
+        now = time.time()
+        elapsed = now - start_time
+        speed = downloaded / elapsed if elapsed > 0 else 0
+        eta = (total - downloaded) / speed if speed > 0 and total > 0 else 0
+        pct = (downloaded / total * 100) if total > 0 else 0
+
+        # Throttle to max 4 updates/sec
+        if now - last_report["time"] < 0.25 and downloaded < total:
+            return
+        last_report["time"] = now
+        last_report["bytes"] = downloaded
+
+        try:
+            queue.put_nowait({
+                "type": "progress",
+                "downloaded": downloaded,
+                "total": total,
+                "pct": round(pct, 1),
+                "speed": round(speed / (1024 * 1024), 2),  # MB/s
+                "eta": round(eta),
+            })
+        except asyncio.QueueFull:
+            pass
+
+    async def event_stream():
+        download_task = asyncio.create_task(_run_download(req.repo, req.filename, progress_callback, queue))
+
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=0.5)
+            except asyncio.TimeoutError:
+                if download_task.done():
+                    break
+                continue
+
+            yield f"data: {json.dumps(event)}\n\n"
+
+            if event.get("type") in ("done", "error"):
+                break
+
+        if not download_task.done():
+            await download_task
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+async def _run_download(repo: str, filename: str, progress_callback, queue: asyncio.Queue):
+    """Run model download and push final result to queue."""
     try:
-        path = await download_model(req.repo, req.filename)
-        return {"success": True, "path": path}
+        path = await download_model(repo, filename, progress_callback=progress_callback)
+        await queue.put({"type": "done", "success": True, "path": path})
     except Exception as e:
-        raise HTTPException(500, f"Download failed: {str(e)}")
+        logger.error("Download failed: %s", e)
+        await queue.put({"type": "error", "success": False, "message": str(e)})
 
 
 # ──────────────────────── Engine Status ────────────────────────
@@ -279,6 +336,41 @@ async def api_delete_provider_key(provider_id: str):
         save_config(config)
 
     return {"success": True}
+
+
+# ──────────────────────── Fallback & Smart Routing ────────────────────────
+
+class FallbackChainRequest(BaseModel):
+    chain: list[str]
+
+
+@app.post("/api/providers/fallback")
+async def api_set_fallback_chain(req: FallbackChainRequest):
+    """Set the fallback chain - ordered list of provider IDs to try."""
+    provider_registry.set_fallback_chain(req.chain)
+
+    # Persist
+    config = load_config()
+    config.setdefault("providers", {})["fallback_chain"] = req.chain
+    save_config(config)
+
+    return {"success": True, "chain": provider_registry.fallback_chain}
+
+
+class SmartRoutingRequest(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/providers/smart-routing")
+async def api_set_smart_routing(req: SmartRoutingRequest):
+    """Enable or disable smart routing (simple→local, complex→cloud)."""
+    provider_registry.set_smart_routing(req.enabled)
+
+    config = load_config()
+    config.setdefault("providers", {})["smart_routing"] = req.enabled
+    save_config(config)
+
+    return {"success": True, "smart_routing": provider_registry.smart_routing}
 
 
 # ──────────────────────── Usage Tracking ────────────────────────

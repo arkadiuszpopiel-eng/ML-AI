@@ -95,11 +95,19 @@ class BaseProvider(ABC):
 
 
 class ProviderRegistry:
-    """Registry of all available inference providers."""
+    """Registry of all available inference providers.
+
+    Supports:
+    - Single active provider (classic mode)
+    - Fallback chain: ordered list of providers to try if primary fails
+    - Smart routing: route simple queries to local, complex to cloud
+    """
 
     def __init__(self):
         self._providers: dict[str, BaseProvider] = {}
         self._active_provider_id: str | None = None
+        self._fallback_chain: list[str] = []
+        self._smart_routing: bool = False
 
     def register(self, provider: BaseProvider):
         """Register a provider."""
@@ -134,11 +142,78 @@ class ProviderRegistry:
         logger.info("Active provider set to: %s", provider_id)
         return True
 
+    # ── Fallback chain ──
+
+    @property
+    def fallback_chain(self) -> list[str]:
+        return list(self._fallback_chain)
+
+    def set_fallback_chain(self, chain: list[str]):
+        """Set ordered list of provider IDs to try as fallbacks."""
+        valid = [pid for pid in chain if pid in self._providers]
+        self._fallback_chain = valid
+        logger.info("Fallback chain set: %s", valid)
+
+    def get_fallback_providers(self) -> list[BaseProvider]:
+        """Get ordered list of available fallback providers (excluding active)."""
+        result = []
+        for pid in self._fallback_chain:
+            if pid == self._active_provider_id:
+                continue
+            provider = self._providers.get(pid)
+            if provider and provider.is_available:
+                result.append(provider)
+        return result
+
+    # ── Smart routing ──
+
+    @property
+    def smart_routing(self) -> bool:
+        return self._smart_routing
+
+    def set_smart_routing(self, enabled: bool):
+        self._smart_routing = enabled
+        logger.info("Smart routing %s", "enabled" if enabled else "disabled")
+
+    def route_message(self, message: str) -> BaseProvider | None:
+        """Pick the best provider for a message based on complexity.
+
+        Simple heuristic:
+        - Short casual messages (< 80 chars, no code markers) → local
+        - Longer or technical messages → cloud (active provider)
+        """
+        if not self._smart_routing:
+            return self.active_provider
+
+        # Check if a cloud provider is available
+        cloud = self.active_provider
+        if not cloud or cloud.provider_id == "local":
+            return self.active_provider
+
+        # Heuristic: is this a simple query?
+        code_markers = ["```", "def ", "function ", "class ", "import ", "SELECT ", "async "]
+        is_complex = (
+            len(message) > 80
+            or any(m in message for m in code_markers)
+            or message.count("\n") > 2
+        )
+
+        if is_complex:
+            return cloud  # Use cloud API for complex queries
+        else:
+            # Check if local engine is running before routing there
+            local = self._providers.get("local")
+            if local and local.is_available:
+                return local
+            return cloud  # Fallback to cloud if local not available
+
     def to_dict(self) -> dict:
         """Serialize registry state."""
         return {
             "active_provider": self._active_provider_id,
             "providers": [p.to_dict() for p in self._providers.values()],
+            "fallback_chain": self._fallback_chain,
+            "smart_routing": self._smart_routing,
         }
 
 

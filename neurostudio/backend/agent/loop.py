@@ -55,12 +55,57 @@ class AgentLoop:
         """Clear a conversation history."""
         self.conversations.pop(session_id, None)
 
-    def _get_active_provider(self):
-        """Get the active provider, or None if only local engine is available."""
+    def _get_active_provider(self, user_message: str | None = None):
+        """Get the active provider, considering smart routing.
+
+        Returns a non-local provider if available, or None for local engine.
+        """
+        if user_message and provider_registry.smart_routing:
+            routed = provider_registry.route_message(user_message)
+            if routed and routed.provider_id != "local":
+                return routed
+            if routed and routed.provider_id == "local":
+                return None  # Signals to use local engine
+
         provider = provider_registry.active_provider
         if provider and provider.provider_id != "local":
             return provider
         return None
+
+    async def _try_provider(self, provider, conversation, tools_schema, temperature):
+        """Try to get a response from a specific provider. Returns response or raises."""
+        return await provider.chat_completion(
+            messages=conversation,
+            tools=tools_schema if tools_schema else None,
+            temperature=temperature,
+        )
+
+    async def _inference_with_fallback(self, cloud_provider, conversation, tools_schema, temperature):
+        """Try the active provider, then fallback chain if it fails.
+
+        Returns (response_dict, provider_used) or raises if all fail.
+        """
+        providers_to_try = []
+        if cloud_provider:
+            providers_to_try.append(cloud_provider)
+
+        # Add fallback providers
+        for fb in provider_registry.get_fallback_providers():
+            if fb not in providers_to_try:
+                providers_to_try.append(fb)
+
+        last_error = None
+        for provider in providers_to_try:
+            try:
+                response = await self._try_provider(provider, conversation, tools_schema, temperature)
+                return response, provider
+            except Exception as e:
+                last_error = e
+                logger.warning("Provider %s failed: %s, trying fallback...", provider.provider_id, e)
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("No providers available")
 
     async def process_message(self, session_id: str, user_message: str, temperature: float = 0.7) -> AsyncIterator[dict]:
         """
@@ -71,6 +116,7 @@ class AgentLoop:
           - {"type": "tool_result", "tool": "...", "result": {...}} -- tool result
           - {"type": "model_switch", "from": "...", "to": "..."} -- model was switched
           - {"type": "provider_info", "provider": "...", "model": "..."} -- active provider
+          - {"type": "fallback", "from": "...", "to": "..."}    -- provider fallback occurred
           - {"type": "error", "message": "..."}       -- error
           - {"type": "done"}                           -- conversation turn complete
         """
@@ -79,16 +125,19 @@ class AgentLoop:
         max_tool_calls = agent_config.get("max_tool_calls", 10)
 
         # Determine inference source: cloud provider or local engine
-        cloud_provider = self._get_active_provider()
+        cloud_provider = self._get_active_provider(user_message)
 
         if cloud_provider:
             # Using cloud/external provider
             if cloud_provider.is_available:
-                yield {
+                info = {
                     "type": "provider_info",
                     "provider": cloud_provider.provider_name,
                     "model": cloud_provider.active_model,
                 }
+                if provider_registry.smart_routing:
+                    info["routed"] = True
+                yield info
             else:
                 yield {"type": "error", "message": f"Provider {cloud_provider.provider_name} niedostepny (brak klucza API?)"}
                 return
@@ -126,12 +175,18 @@ class AgentLoop:
         while tool_call_count < max_tool_calls:
             try:
                 if cloud_provider:
-                    # Use external provider
-                    response = await cloud_provider.chat_completion(
-                        messages=conversation,
-                        tools=tools_schema if tools_schema else None,
-                        temperature=temperature,
+                    # Use external provider with fallback chain
+                    response, used_provider = await self._inference_with_fallback(
+                        cloud_provider, conversation, tools_schema, temperature
                     )
+                    # Notify if fallback was used
+                    if used_provider != cloud_provider:
+                        yield {
+                            "type": "fallback",
+                            "from": cloud_provider.provider_name,
+                            "to": used_provider.provider_name,
+                        }
+                        cloud_provider = used_provider
                 else:
                     # Use local llama.cpp engine
                     response = await engine.chat_completion(

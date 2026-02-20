@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NeuroForge - Local AI Studio</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -64,6 +66,26 @@
                     <div id="provider-keys-list" class="provider-keys-list" style="margin-top:10px">
                         <small style="color:var(--text-secondary)">Skonfigurowane API:</small>
                         <div id="provider-keys-grid" class="provider-keys-grid"></div>
+                    </div>
+
+                    <!-- Fallback chain -->
+                    <div class="fallback-section" style="margin-top:10px">
+                        <div class="fallback-header">
+                            <small style="color:var(--text-secondary)">Lancuch awaryjny (fallback):</small>
+                        </div>
+                        <div id="fallback-chain-list" class="fallback-chain-list"></div>
+                        <select id="fallback-add-select" class="select-full" style="margin-top:4px">
+                            <option value="">+ Dodaj provider do lancucha</option>
+                        </select>
+                    </div>
+
+                    <!-- Smart routing toggle -->
+                    <div class="smart-routing-row" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+                        <small style="color:var(--text-secondary)" title="Proste pytania -> lokalny model, zlozone -> chmura">Smart routing</small>
+                        <label class="switch">
+                            <input type="checkbox" id="smart-routing-toggle">
+                            <span class="switch-slider"></span>
+                        </label>
                     </div>
                 </div>
             </div>

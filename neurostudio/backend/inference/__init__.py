@@ -32,6 +32,15 @@ def init_providers():
     active = providers_config.get("active", "local")
     provider_registry.set_active(active)
 
+    # Load fallback chain
+    fallback = providers_config.get("fallback_chain", [])
+    if fallback:
+        provider_registry.set_fallback_chain(fallback)
+
+    # Load smart routing setting
+    smart_routing = providers_config.get("smart_routing", False)
+    provider_registry.set_smart_routing(smart_routing)
+
 
 # Auto-init on import
 init_providers()

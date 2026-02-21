@@ -1,4 +1,4 @@
-/* NeuroForge - Local AI Studio v0.3.0 - Responsive UI */
+/* NeuroForge - Local AI Studio v0.7.0 - Responsive UI */
 
 :root {
     --bg-primary: #0f0f14;
@@ -149,6 +149,277 @@ html, body {
     max-height: 0 !important;
     opacity: 0;
     padding: 0;
+}
+
+/* ──── Sidebar Tabs ──── */
+
+.sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-primary);
+    flex-shrink: 0;
+}
+
+.sidebar-tab {
+    flex: 1;
+    padding: 8px 4px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.72em;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+}
+
+.sidebar-tab:hover {
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+}
+
+.sidebar-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--bg-secondary);
+}
+
+.sidebar-tab-content {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.sidebar-tab-content.active {
+    display: block;
+}
+
+.sidebar-footer {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+}
+
+/* ──── Chat Toolbar (capabilities) ──── */
+
+.chat-toolbar {
+    padding: 4px 16px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.toolbar-toggles {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.toolbar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 14px;
+    font-size: 0.72em;
+    cursor: pointer;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    transition: all var(--transition);
+    margin-bottom: 0;
+    user-select: none;
+}
+
+.toolbar-toggle:hover {
+    border-color: var(--accent);
+}
+
+.toolbar-toggle input {
+    display: none;
+}
+
+.toolbar-toggle input:checked ~ .toolbar-toggle-icon,
+.toolbar-toggle input:checked ~ .toolbar-toggle-label {
+    color: var(--accent);
+}
+
+.toolbar-toggle input:checked ~ .toolbar-toggle-icon {
+    filter: none;
+}
+
+.toolbar-toggle input:not(:checked) ~ .toolbar-toggle-icon {
+    opacity: 0.4;
+}
+
+.toolbar-toggle input:not(:checked) ~ .toolbar-toggle-label {
+    opacity: 0.4;
+    text-decoration: line-through;
+}
+
+.toolbar-toggle-icon {
+    font-size: 1.1em;
+}
+
+.toolbar-toggle-label {
+    font-size: 0.95em;
+}
+
+/* ──── Resource Settings Panel ──── */
+
+.resource-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+}
+
+.resource-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.resource-label {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.resource-value {
+    font-size: 0.72em;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.resource-bar {
+    height: 6px;
+    background: var(--bg-primary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.resource-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.resource-fill.gpu {
+    background: linear-gradient(90deg, var(--success), #00cec9);
+}
+
+.resource-fill.disk {
+    background: linear-gradient(90deg, var(--warning), #f39c12);
+}
+
+.resource-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.resource-slider-row small {
+    flex-shrink: 0;
+    font-size: 0.72em;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.resource-range {
+    flex: 1;
+    height: 4px;
+}
+
+.resource-slider-val {
+    font-size: 0.72em;
+    color: var(--text-secondary);
+    font-family: monospace;
+    flex-shrink: 0;
+    width: 30px;
+    text-align: right;
+}
+
+.resource-meta {
+    font-size: 0.72em;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 2px;
+}
+
+/* ──── Download Cancel ──── */
+
+.btn-cancel-download {
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 0.75em;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: background var(--transition);
+}
+
+.btn-cancel-download:hover {
+    background: #c0392b;
+}
+
+/* ──── Multi-Agent Role Config ──── */
+
+.ma-role-config {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.ma-role-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+}
+
+.ma-role-row .ma-role-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.ma-role-name {
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex-shrink: 0;
+    min-width: 60px;
+}
+
+.ma-role-select {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.72em;
 }
 
 .model-controls {

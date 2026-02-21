@@ -24,7 +24,7 @@ from .inference.model_manager import (
 )
 from .agent.loop import agent
 from .agent.orchestrator import orchestrator
-from .agent.roles import list_roles_dict
+from .agent.roles import list_roles_dict, get_role, update_role_config
 from .inference.router import (
     get_router_config, update_router_config, detect_task_type, get_task_scores
 )
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     await engine.stop()
 
 
-app = FastAPI(title="NeuroForge", version="0.6.0", lifespan=lifespan)
+app = FastAPI(title="NeuroForge", version="0.7.0", lifespan=lifespan)
 
 # Mount static files
 app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
@@ -785,6 +785,32 @@ async def api_list_uploads():
 async def api_list_roles():
     """List all available agent roles."""
     return {"roles": list_roles_dict()}
+
+
+class RoleConfigRequest(BaseModel):
+    role_id: str
+    provider: str | None = None
+    model: str | None = None
+
+
+@app.post("/api/agents/roles/config")
+async def api_update_role_config(req: RoleConfigRequest):
+    """Update model/provider configuration for an agent role."""
+    role = get_role(req.role_id)
+    if not role:
+        raise HTTPException(404, f"Unknown role: {req.role_id}")
+
+    update_role_config(req.role_id, req.provider, req.model)
+
+    # Persist to config
+    config = load_config()
+    config.setdefault("agent_roles", {})[req.role_id] = {
+        "preferred_provider": req.provider,
+        "preferred_model": req.model,
+    }
+    save_config(config)
+
+    return {"success": True, "role": role.to_dict()}
 
 
 class MultiAgentRequest(BaseModel):

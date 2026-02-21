@@ -137,3 +137,23 @@ def list_roles() -> list[AgentRole]:
 def list_roles_dict() -> list[dict]:
     """List all roles as serializable dicts."""
     return [r.to_dict() for r in BUILTIN_ROLES.values()]
+
+
+def update_role_config(role_id: str, provider: str | None, model: str | None) -> bool:
+    """Update preferred provider and model for a role."""
+    role = BUILTIN_ROLES.get(role_id)
+    if not role:
+        return False
+    role.preferred_provider = provider
+    role.preferred_model = model
+    return True
+
+
+def load_role_configs(config: dict) -> None:
+    """Load saved role configurations from config dict."""
+    role_configs = config.get("agent_roles", {})
+    for role_id, rc in role_configs.items():
+        role = BUILTIN_ROLES.get(role_id)
+        if role:
+            role.preferred_provider = rc.get("preferred_provider")
+            role.preferred_model = rc.get("preferred_model")

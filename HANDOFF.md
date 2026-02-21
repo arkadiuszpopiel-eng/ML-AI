@@ -1,9 +1,9 @@
 # NeuroForge ML/AI - Handoff dla nowego AI
 
 ## TL;DR
-**NeuroForge Local AI Studio v0.6.0** - kompletna aplikacja do uruchamiania lokalnych LLM i zewnetrznych API AI na GPU AMD RX 9070 XT.
+**NeuroForge Local AI Studio v0.7.0** - kompletna aplikacja do uruchamiania lokalnych LLM i zewnetrznych API AI na GPU.
 FastAPI backend + vanilla JS frontend + llama.cpp inference + 6 providerow AI + system multi-agent.
-**Kod jest GOTOWY i KOMPLETNY** - ~60 plikow, ~12000 linii + 221 testow.
+**Kod jest GOTOWY i KOMPLETNY** - ~60 plikow, ~14000 linii + 233 testow.
 
 ---
 
@@ -51,7 +51,7 @@ ML-AI/
     │   ├── usage.py                   # Śledzenie tokenów/kosztów per provider (151 linii)
     │   ├── monitor.py                 # Monitor CPU/RAM/GPU - AMD + NVIDIA (194 linii)
     │   ├── setup.py                   # Auto-download llama.cpp binary (218 linii)
-    │   ├── templates.py               # 12 wbudowanych szablonów promptów PL (171 linii)
+    │   ├── templates.py               # [v0.7] 24 wbudowanych szablonów promptów PL
     │   ├── inference/
     │   │   ├── __init__.py            # Rejestracja providerów przy imporcie
     │   │   ├── engine.py              # Zarządzanie procesem llama.cpp (191 linii)
@@ -66,7 +66,7 @@ ML-AI/
     │   │   └── provider_openrouter.py # OpenRouter (100+ modeli)
     │   ├── agent/
     │   │   ├── loop.py                # Pętla agenta z narzędziami (275 linii)
-    │   │   ├── roles.py               # [v0.6] Role agentów: planner/coder/reviewer/researcher
+    │   │   ├── roles.py               # [v0.6+] Role agentów + update_role_config() + load_role_configs()
     │   │   ├── shared_context.py      # [v0.6] Pamięć współdzielona, message passing, artefakty
     │   │   └── orchestrator.py        # [v0.6] Orkiestrator multi-agent z równoległym wykonywaniem
     │   ├── rag/
@@ -80,9 +80,9 @@ ML-AI/
     │       ├── shell.py               # Komendy systemowe + procesy (162 linii)
     │       └── rag_search.py          # Wyszukiwanie w dokumentach RAG (52 linii)
     └── frontend/
-        ├── index.html                 # Interfejs UI (400+ linii)
-        ├── css/style.css              # Dark theme, responsive (2000+ linii)
-        └── js/app.js                  # WebSocket + logika UI (1900+ linii)
+        ├── index.html                 # [v0.7] Interfejs UI z sidebar tabs (500+ linii)
+        ├── css/style.css              # [v0.7] Dark theme, responsive, resource panel (2400+ linii)
+        └── js/app.js                  # [v0.7] WebSocket + logika UI + tabs + capabilities (2300+ linii)
 ```
 
 ---
@@ -102,7 +102,7 @@ ML-AI/
 - **RAG engine** - TF-IDF, chunking z overlap, trwaly indeks na dysku (v2 - instant restart)
 - **Storage** - persystencja konwersacji jako JSON + eksport do Markdown/JSON
 - **Monitor** - CPU/RAM/dysk/GPU (AMD rocm-smi + NVIDIA nvidia-smi)
-- **12 szablonow promptow** po polsku (code review, testy, tlumaczenia, refaktoring...)
+- **24 szablonow promptow** po polsku (code review, testy, debug, security audit, API design, brainstorming...)
 - **Auto-setup** - instalacja llama-server z poziomu UI (bez recznego uruchamiania install.py)
 - **Multi-Agent System** (v0.6):
   - **Orkiestrator** - koordynacja podzadan, rownolegle wykonywanie, fallback na awarie
@@ -115,14 +115,18 @@ ML-AI/
 - **Dark theme** z fioletowym akcentem (#6c5ce7)
 - **Real-time chat** przez WebSocket ze streamingiem
 - **Syntax highlighting** - kolorowanie kodu (highlight.js) z przyciskiem Kopiuj
-- **Panel boczny:** historia konwersacji (z eksportem MD/JSON), zarzadzanie modelami, ustawienia GPU
+- **Sidebar z tabami** (v0.7): 4 zakladki (Czat, Modele, Config, Narzedzia) eliminuja scrollowanie
 - **Panel Provider AI** - wybor providera, fallback chain, smart routing, klucze API
 - **Dedykowana zakladka Klucze API** - formularze per provider z zapisem/usuwaniem
 - **Katalog modeli** - 13 modeli w 5 kategoriach (kodowanie, ogolne, kreatywne, lekkie, powerhouse)
-- **Prawdziwy pasek postepu** pobierania modeli (%, MB/s, ETA)
+- **Prawdziwy pasek postepu** pobierania modeli (%, MB/s, ETA) + przycisk Anuluj (v0.7)
+- **Rozszerzone konteksty** (v0.7): 4K, 8K, 16K, 32K, 48K, 64K, 96K, 128K
+- **Chat toolbar** (v0.7): przelaczniki funkcji AI (Internet, Kod, Pliki, Shell, RAG)
+- **Panel zasobow systemowych** (v0.7): GPU VRAM, RAM, Dysk z limitami (slidery)
+- **Multi-Agent role config** (v0.7): wybor modelu/providera per rola (Planner, Coder, Reviewer, Researcher)
 - **Status bar** aktywnego providera z zuzyciem tokenow i kosztem
-- **Panel szablonow** z kategoriami (coding, text, tools)
-- **Monitor systemowy** z auto-odswiezaniem co 2s
+- **Panel szablonow** z 6 kategoriami (kodowanie, tekst, narzedzia, analiza, kreatywne)
+- **Monitor systemowy** z auto-odswiezaniem co 5s
 - **Panel Multi-Agent** - uruchamianie zespolu agentow, wizualizacja przeplywu pracy
 - **Workflow visualization** - real-time widok podzadan, statusy, wyniki agentow
 - **Responsywny** - dziala na mobile
@@ -214,8 +218,9 @@ ML-AI/
 - `POST /api/templates` - utworz wlasny
 - `DELETE /api/templates/{id}` - usun
 
-### Multi-Agent (v0.6)
+### Multi-Agent (v0.6+)
 - `GET /api/agents/roles` - lista dostepnych rol agentow
+- `POST /api/agents/roles/config` - [v0.7] konfiguracja modelu/providera per rola (body: `{role_id, provider, model}`)
 - `POST /api/agents/run` - uruchom workflow multi-agent (SSE stream z eventami)
 - `GET /api/agents/workflows` - lista aktywnych/zakonczonych workflows
 - `GET /api/agents/workflows/{id}` - szczegoly workflow (podzadania, wiadomosci, artefakty)
@@ -350,6 +355,40 @@ workflow_error  → {message}
 
 ---
 
+## Zmiany v0.7.0
+
+### Nowe funkcje
+- **Sidebar tabs** - przereorganizowany sidebar z 4 zakladkami zamiast scrollowania
+- **Chat toolbar** - przelaczniki AI capabilities: Internet, Kod, Pliki, Shell, RAG
+- **Resource panel** - monitoring GPU VRAM / RAM / Dysk z limitami
+- **Konteksty 48K-128K** - wieksze rozmiary kontekstu dla wiekszych modeli
+- **Anulowanie pobierania** - przycisk Anuluj z AbortController
+- **Role model config** - UI i API do wybierania modelu/providera per rola agenta
+- **12 nowych szablonow** - debug, API, SQL, security audit, architektura, brainstorm, regex, dane, email, dokumentacja, technologie, wydajnosc
+
+### Zmiany UI
+- Sidebar: 4 zakladki (Czat | Modele | Config | Narzedzia)
+- Zakladka "Czat": historia + provider AI
+- Zakladka "Modele": silnik lokalny, GPU settings, zasoby systemowe, pobieranie modeli
+- Zakladka "Config": klucze API, semantic router
+- Zakladka "Narzedzia": multi-agent, dokumenty RAG
+- Chat toolbar: pod oknem czatu, nad inputem
+- Szablony: 6 kategorii (dodane: analysis, creative)
+
+### Nowe endpointy
+- `POST /api/agents/roles/config` - konfiguracja modelu/providera per rola agenta
+
+### Zmienione pliki
+- `frontend/index.html` - pelna przebudowa sidebar na taby, chat toolbar, resource panel
+- `frontend/css/style.css` - ~400 nowych linii CSS (tabs, toolbar, resources, cancel, role config)
+- `frontend/js/app.js` - ~400 nowych linii JS (tab switching, capabilities sync, resource monitoring, download cancel, role model selection)
+- `backend/app.py` - nowy endpoint roles/config, wersja 0.7.0
+- `backend/agent/roles.py` - update_role_config(), load_role_configs()
+- `backend/templates.py` - 12 nowych szablonow (24 razem)
+- `start.bat`, `start.sh` - wersja 0.7.0
+
+---
+
 ## Znane ograniczenia (NIE bugi)
 
 - Indeks RAG jest w pamięci (dokumenty zapisane na dysku, ale indeks przebudowywany po restarcie)
@@ -427,7 +466,7 @@ workflow_error  → {message}
 - [x] **Karta aktywnego providera** - info + przycisk dezaktywacji
 - [x] **Testy:** 167 testow razem
 
-### v0.6 - Multi-Agent (GOTOWE - aktualny stan)
+### v0.6 - Multi-Agent (GOTOWE)
 > Kilka agentow AI wspolpracuje nad zlozonym zadaniem.
 
 - [x] **Orkiestrator agentow** - 3-fazowy workflow: Planning → Execution → Synthesis
@@ -444,7 +483,24 @@ workflow_error  → {message}
 - [x] **WebSocket:** WS /ws/agents - real-time workflow events
 - [x] **Testy:** 54 nowe testy (role, shared context, orchestrator) = 221 testow razem
 
-### v0.7 - Vision (DO ZROBIENIA)
+### v0.7 - UI/UX + Narzedzia (GOTOWE - aktualny stan)
+> Duzy overhaul UI/UX, panel zasobow, toolbar capabilities, szablony, anulowanie pobierania.
+
+- [x] **Sidebar z tabami** - 4 zakladki (Czat, Modele, Config, Narzedzia) zamiast jednego scrollowanego panelu
+- [x] **Wieksze konteksty** - 48K, 64K, 96K, 128K (wczesniej max 32K)
+- [x] **Chat toolbar** - przelaczniki funkcji AI (Internet, Kod, Pliki, Shell, RAG) z zapamietywaniem
+- [x] **Panel zasobow systemowych** - GPU VRAM, RAM, Dysk (NVME/SSD) z real-time danymi i sliderami limitow
+- [x] **Anulowanie pobierania** - przycisk Anuluj na kazdym pobieranym modelu (AbortController + cancel btn)
+- [x] **Multi-Agent role config** - wybor modelu/providera per rola agenta (dropdown w UI + API endpoint)
+- [x] **24 szablonow promptow** - 12 nowych solidnych szablonow (debug, API design, SQL, security audit, architektura, brainstorming, regex, dane, email, dokumentacja, porownanie technologii, analiza wydajnosci)
+- [x] **6 kategorii szablonow** - kodowanie, tekst, narzedzia, analiza, kreatywne (wczesniej 3)
+- [x] **API:** POST /api/agents/roles/config (ustawienia modelu per rola)
+- [x] **Persystencja capability toggles** - zapisywanie preferencji w localStorage
+- [x] **Sync capabilities z backendem** - POST /api/config aktualizuje tools.* w config.yaml
+- [x] **Wersja:** 0.7.0 (app.py, index.html, start.bat, start.sh)
+- [x] **Testy:** 233 (wszystkie przeszly)
+
+### v0.8 - Vision + Multimedia (DO ZROBIENIA)
 > Analiza obrazow i screenshotow przez modele multimodalne.
 
 - [ ] Obsluga modeli multimodalnych (LLaVA, Qwen-VL, GPT-4o vision)
@@ -453,18 +509,32 @@ workflow_error  → {message}
 - [ ] OCR z obrazow (wyciaganie tekstu)
 - [ ] Generowanie opisow obrazow
 - [ ] UI: podglad obrazow w konwersacji
+- [ ] Obsluga plikow audio/video (transkrypcja Whisper)
+
+### v0.9 - Zaawansowane workflow (DO ZROBIENIA)
+> Rozbudowa systemu agentow i integracji.
+
+- [ ] **Persistent agent memory** - dlugoterminowa pamiec agentow miedzy sesjami
+- [ ] **Custom role builder** - tworzenie wlasnych rol agentow w UI
+- [ ] **Workflow templates** - predefiniowane scenariusze multi-agent (code review pipeline, research pipeline)
+- [ ] **Agent chaining** - lancuchy agentow z warunkami (if/else branching)
+- [ ] **Git integration** - narzedzie git (commit, diff, branch, PR) w agent loop
+- [ ] **Database tool** - zapytania SQL/NoSQL jako narzedzie agenta
+- [ ] **API caller tool** - wysylanie HTTP requestow jako narzedzie
 
 ### v1.0 - Production Release (DO ZROBIENIA)
 > Dopracowany produkt gotowy do codziennego uzytku.
 
 - [ ] **System pluginow** - dynamiczne ladowanie narzedzi z katalogu plugins/
 - [ ] **Profile uzytkownikow** - ustawienia, historia, preferencje per user
-- [ ] **Polished UI** - animacje, onboarding, lepszy UX
-- [ ] **i18n** - wielojezyczne szablony i interfejs (PL + EN)
+- [ ] **Polished UI** - animacje, onboarding, dark/light theme toggle
+- [ ] **i18n** - wielojezyczne szablony i interfejs (PL + EN + DE)
 - [ ] **Eksport PDF** - eksport konwersacji jako PDF
 - [ ] **Rate limiting + auth token** - bezpieczenstwo API
 - [ ] **PWA** - manifest + service worker (offline mode)
-- [ ] **Wiecej narzedzi** - git, baza danych SQL, API caller, image gen
+- [ ] **Auto-update** - sprawdzanie nowych wersji + self-update
+- [ ] **Backup/Restore** - eksport/import calej konfiguracji i danych
+- [ ] **Marketplace szablonow** - udostepnianie szablonow wspolnoty
 
 ---
 

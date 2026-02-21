@@ -26,220 +26,281 @@
                 <span id="status-text">Brak modelu</span>
             </div>
 
-            <!-- Conversation History -->
-            <div class="sidebar-section">
-                <h3 class="section-toggle" data-target="conversation-list">Historia <span class="toggle-arrow">&#9660;</span></h3>
-                <div id="conversation-list" class="section-content conversation-list">
-                    <div class="conversation-list-empty">Brak zapisanych rozmow</div>
-                </div>
+            <!-- ═══════ SIDEBAR TABS ═══════ -->
+            <div class="sidebar-tabs">
+                <button class="sidebar-tab active" data-tab="tab-chat" title="Czat i historia">&#128172; Czat</button>
+                <button class="sidebar-tab" data-tab="tab-models" title="Modele i silnik">&#129302; Modele</button>
+                <button class="sidebar-tab" data-tab="tab-config" title="Konfiguracja">&#9881; Config</button>
+                <button class="sidebar-tab" data-tab="tab-tools" title="Narzedzia i agenty">&#128295; Narzedzia</button>
             </div>
 
-            <!-- ═══════ Provider AI (przebudowany) ═══════ -->
-            <div class="sidebar-section collapsible">
-                <h3 class="section-toggle" data-target="provider-panel">Provider AI <span class="toggle-arrow">&#9660;</span></h3>
-                <div id="provider-panel" class="section-content">
-
-                    <!-- Aktywny provider info -->
-                    <div id="active-provider-card" class="active-provider-card">
-                        <div class="apc-header">
-                            <span id="apc-indicator" class="provider-bar-indicator local"></span>
-                            <span id="apc-name">Lokalny (llama.cpp)</span>
-                        </div>
-                        <div id="apc-model" class="apc-model"></div>
-                        <button id="btn-deactivate-provider" class="btn btn-xs btn-danger" style="margin-top:4px" disabled>Dezaktywuj</button>
+            <!-- ═══════ TAB: CHAT ═══════ -->
+            <div class="sidebar-tab-content active" id="tab-chat">
+                <!-- Conversation History -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="conversation-list">Historia <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="conversation-list" class="section-content conversation-list">
+                        <div class="conversation-list-empty">Brak zapisanych rozmow</div>
                     </div>
+                </div>
 
-                    <!-- Przelaczanie providera -->
-                    <div class="provider-switch-row">
-                        <select id="provider-select" class="select-full">
-                            <option value="local">Lokalny (llama.cpp)</option>
-                        </select>
-                        <div id="provider-model-row" class="provider-model-row hidden">
-                            <select id="provider-model-select" class="select-full" style="margin-top:6px">
-                                <option value="">-- Wybierz model --</option>
+                <!-- Provider AI -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="provider-panel">Provider AI <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="provider-panel" class="section-content">
+                        <!-- Aktywny provider info -->
+                        <div id="active-provider-card" class="active-provider-card">
+                            <div class="apc-header">
+                                <span id="apc-indicator" class="provider-bar-indicator local"></span>
+                                <span id="apc-name">Lokalny (llama.cpp)</span>
+                            </div>
+                            <div id="apc-model" class="apc-model"></div>
+                            <button id="btn-deactivate-provider" class="btn btn-xs btn-danger" style="margin-top:4px" disabled>Dezaktywuj</button>
+                        </div>
+
+                        <!-- Przelaczanie providera -->
+                        <div class="provider-switch-row">
+                            <select id="provider-select" class="select-full">
+                                <option value="local">Lokalny (llama.cpp)</option>
+                            </select>
+                            <div id="provider-model-row" class="provider-model-row hidden">
+                                <select id="provider-model-select" class="select-full" style="margin-top:6px">
+                                    <option value="">-- Wybierz model --</option>
+                                </select>
+                            </div>
+                            <button id="btn-activate-provider" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">Aktywuj</button>
+                        </div>
+
+                        <!-- Grid skonfigurowanych kluczy -->
+                        <div id="provider-keys-list" class="provider-keys-list" style="margin-top:10px">
+                            <small style="color:var(--text-secondary)">Skonfigurowane API:</small>
+                            <div id="provider-keys-grid" class="provider-keys-grid"></div>
+                        </div>
+
+                        <!-- Fallback chain -->
+                        <div class="fallback-section" style="margin-top:10px">
+                            <div class="fallback-header">
+                                <small style="color:var(--text-secondary)">Lancuch awaryjny (fallback):</small>
+                            </div>
+                            <div id="fallback-chain-list" class="fallback-chain-list"></div>
+                            <select id="fallback-add-select" class="select-full" style="margin-top:4px">
+                                <option value="">+ Dodaj provider do lancucha</option>
                             </select>
                         </div>
-                        <button id="btn-activate-provider" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">Aktywuj</button>
-                    </div>
 
-                    <!-- Grid skonfigurowanych kluczy -->
-                    <div id="provider-keys-list" class="provider-keys-list" style="margin-top:10px">
-                        <small style="color:var(--text-secondary)">Skonfigurowane API:</small>
-                        <div id="provider-keys-grid" class="provider-keys-grid"></div>
-                    </div>
-
-                    <!-- Fallback chain -->
-                    <div class="fallback-section" style="margin-top:10px">
-                        <div class="fallback-header">
-                            <small style="color:var(--text-secondary)">Lancuch awaryjny (fallback):</small>
+                        <!-- Smart routing toggle -->
+                        <div class="smart-routing-row" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+                            <small style="color:var(--text-secondary)" title="Proste pytania -> lokalny model, zlozone -> chmura">Smart routing</small>
+                            <label class="switch">
+                                <input type="checkbox" id="smart-routing-toggle">
+                                <span class="switch-slider"></span>
+                            </label>
                         </div>
-                        <div id="fallback-chain-list" class="fallback-chain-list"></div>
-                        <select id="fallback-add-select" class="select-full" style="margin-top:4px">
-                            <option value="">+ Dodaj provider do lancucha</option>
-                        </select>
-                    </div>
-
-                    <!-- Smart routing toggle -->
-                    <div class="smart-routing-row" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
-                        <small style="color:var(--text-secondary)" title="Proste pytania -> lokalny model, zlozone -> chmura">Smart routing</small>
-                        <label class="switch">
-                            <input type="checkbox" id="smart-routing-toggle">
-                            <span class="switch-slider"></span>
-                        </label>
                     </div>
                 </div>
             </div>
 
-            <!-- ═══════ Klucze API (NOWA ZAKLADKA) ═══════ -->
-            <div class="sidebar-section collapsible">
-                <h3 class="section-toggle" data-target="api-keys-panel">Klucze API <span class="toggle-arrow">&#9660;</span></h3>
-                <div id="api-keys-panel" class="section-content">
-                    <div id="api-keys-forms" class="api-keys-forms"></div>
-                </div>
-            </div>
-
-            <!-- Model Selection -->
-            <div class="sidebar-section">
-                <h3>Model lokalny</h3>
-
+            <!-- ═══════ TAB: MODELS ═══════ -->
+            <div class="sidebar-tab-content" id="tab-models">
                 <!-- Engine setup notification -->
-                <div id="engine-setup-box" class="engine-setup-box hidden">
-                    <div class="engine-setup-msg">
-                        <span class="engine-setup-icon">&#9888;</span>
-                        <span id="engine-setup-text">llama-server nie zainstalowany. Zainstaluj silnik aby ladowac modele lokalnie.</span>
+                <div class="sidebar-section">
+                    <h3>Silnik lokalny</h3>
+                    <div id="engine-setup-box" class="engine-setup-box hidden">
+                        <div class="engine-setup-msg">
+                            <span class="engine-setup-icon">&#9888;</span>
+                            <span id="engine-setup-text">llama-server nie zainstalowany.</span>
+                        </div>
+                        <button id="btn-install-engine" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">
+                            &#128229; Zainstaluj llama-server
+                        </button>
+                        <div id="engine-install-progress" class="engine-install-progress hidden">
+                            <div class="dl-progress-bar"><div id="engine-install-fill" class="dl-progress-fill"></div></div>
+                            <div id="engine-install-status" class="dl-progress-info" style="justify-content:center">Instalowanie...</div>
+                        </div>
                     </div>
-                    <button id="btn-install-engine" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">
-                        &#128229; Zainstaluj llama-server
-                    </button>
-                    <div id="engine-install-progress" class="engine-install-progress hidden">
-                        <div class="dl-progress-bar"><div id="engine-install-fill" class="dl-progress-fill"></div></div>
-                        <div id="engine-install-status" class="dl-progress-info" style="justify-content:center">Instalowanie...</div>
+
+                    <select id="model-select" class="select-full">
+                        <option value="">-- Wybierz model --</option>
+                    </select>
+                    <div class="model-controls">
+                        <button id="btn-load-model" class="btn btn-sm btn-success">Zaladuj</button>
+                        <button id="btn-unload-model" class="btn btn-sm btn-danger" disabled>Wyladuj</button>
                     </div>
                 </div>
 
-                <select id="model-select" class="select-full">
-                    <option value="">-- Wybierz model --</option>
-                </select>
-                <div class="model-controls">
-                    <button id="btn-load-model" class="btn btn-sm btn-success">Zaladuj</button>
-                    <button id="btn-unload-model" class="btn btn-sm btn-danger" disabled>Wyladuj</button>
-                </div>
-            </div>
-
-            <!-- GPU Settings -->
-            <div class="sidebar-section collapsible">
-                <h3 class="section-toggle" data-target="gpu-settings">Ustawienia GPU <span class="toggle-arrow">&#9660;</span></h3>
-                <div id="gpu-settings" class="section-content">
-                    <label>Warstwy na GPU:
-                        <input type="number" id="gpu-layers" value="-1" min="-1" max="999" class="input-sm">
-                        <small>-1 = wszystko na GPU</small>
-                    </label>
-                    <label>Rozmiar kontekstu:
-                        <select id="context-size" class="select-full">
-                            <option value="4096">4K</option>
-                            <option value="8192" selected>8K</option>
-                            <option value="16384">16K</option>
-                            <option value="32768">32K</option>
-                        </select>
-                    </label>
-                    <label>Watki CPU:
-                        <input type="number" id="cpu-threads" value="8" min="1" max="32" class="input-sm">
-                    </label>
-                    <label>Temperatura:
-                        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" class="range-full">
-                        <span id="temp-value">0.7</span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Model Download (przebudowany z kategoriami) -->
-            <div class="sidebar-section collapsible">
-                <h3 class="section-toggle" data-target="model-download">Pobierz modele <span class="toggle-arrow">&#9660;</span></h3>
-                <div id="model-download" class="section-content">
-                    <div id="download-categories" class="download-categories">
-                        <button class="dl-cat active" data-cat="all">Wszystkie</button>
-                        <button class="dl-cat" data-cat="coding">Kodowanie</button>
-                        <button class="dl-cat" data-cat="general">Ogolne</button>
-                        <button class="dl-cat" data-cat="creative">Kreatywne</button>
-                        <button class="dl-cat" data-cat="lightweight">Lekkie</button>
-                    </div>
-                    <div id="recommended-models"></div>
-                </div>
-            </div>
-
-            <!-- Semantic Router -->
-            <div class="sidebar-section collapsible">
-                <h3 class="section-toggle" data-target="router-panel">Semantic Router <span class="toggle-arrow">&#9660;</span></h3>
-                <div id="router-panel" class="section-content">
-                    <div class="router-toggle-row">
-                        <span class="router-label">Auto-routing</span>
-                        <label class="switch">
-                            <input type="checkbox" id="router-enabled">
-                            <span class="switch-slider"></span>
+                <!-- GPU Settings -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="gpu-settings">Ustawienia GPU <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="gpu-settings" class="section-content">
+                        <label>Warstwy na GPU:
+                            <input type="number" id="gpu-layers" value="-1" min="-1" max="999" class="input-sm">
+                            <small>-1 = wszystko na GPU</small>
                         </label>
-                    </div>
-                    <div id="router-assignments" class="router-assignments">
-                        <label>Kodowanie:
-                            <select id="router-coding" class="select-full router-select">
-                                <option value="">-- domyslny model --</option>
+                        <label>Rozmiar kontekstu:
+                            <select id="context-size" class="select-full">
+                                <option value="4096">4K</option>
+                                <option value="8192" selected>8K</option>
+                                <option value="16384">16K</option>
+                                <option value="32768">32K</option>
+                                <option value="49152">48K</option>
+                                <option value="65536">64K</option>
+                                <option value="98304">96K</option>
+                                <option value="131072">128K</option>
                             </select>
                         </label>
-                        <label>Analiza:
-                            <select id="router-analysis" class="select-full router-select">
-                                <option value="">-- domyslny model --</option>
-                            </select>
+                        <label>Watki CPU:
+                            <input type="number" id="cpu-threads" value="8" min="1" max="32" class="input-sm">
                         </label>
-                        <label>Kreatywne:
-                            <select id="router-creative" class="select-full router-select">
-                                <option value="">-- domyslny model --</option>
-                            </select>
-                        </label>
-                        <label>Chat:
-                            <select id="router-chat" class="select-full router-select">
-                                <option value="">-- domyslny model --</option>
-                            </select>
+                        <label>Temperatura:
+                            <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" class="range-full">
+                            <span id="temp-value">0.7</span>
                         </label>
                     </div>
-                    <div class="router-test-area">
-                        <input type="text" id="router-test-input" class="input-sm" placeholder="Testuj routing...">
-                        <button id="btn-router-test" class="btn btn-sm btn-ghost" style="margin-top:4px;width:100%">Testuj</button>
-                        <div id="router-test-result" class="router-test-result hidden"></div>
+                </div>
+
+                <!-- Resource Settings -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="resource-panel">Zasoby systemowe <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="resource-panel" class="section-content">
+                        <div class="resource-card">
+                            <div class="resource-header">
+                                <span class="resource-label">GPU VRAM</span>
+                                <span id="resource-gpu-info" class="resource-value">-- / -- GB</span>
+                            </div>
+                            <div class="resource-bar"><div id="resource-gpu-fill" class="resource-fill gpu" style="width:0%"></div></div>
+                            <div class="resource-slider-row">
+                                <small>Limit VRAM:</small>
+                                <input type="range" id="resource-gpu-limit" min="0" max="100" value="90" class="range-full resource-range">
+                                <span id="resource-gpu-limit-val" class="resource-slider-val">90%</span>
+                            </div>
+                        </div>
+                        <div class="resource-card">
+                            <div class="resource-header">
+                                <span class="resource-label">RAM</span>
+                                <span id="resource-ram-info" class="resource-value">-- / -- GB</span>
+                            </div>
+                            <div class="resource-bar"><div id="resource-ram-fill" class="resource-fill" style="width:0%"></div></div>
+                            <div class="resource-slider-row">
+                                <small>Limit RAM:</small>
+                                <input type="range" id="resource-ram-limit" min="0" max="100" value="80" class="range-full resource-range">
+                                <span id="resource-ram-limit-val" class="resource-slider-val">80%</span>
+                            </div>
+                        </div>
+                        <div class="resource-card">
+                            <div class="resource-header">
+                                <span class="resource-label">Dysk (NVME/SSD)</span>
+                                <span id="resource-disk-info" class="resource-value">-- / -- GB</span>
+                            </div>
+                            <div class="resource-bar"><div id="resource-disk-fill" class="resource-fill disk" style="width:0%"></div></div>
+                            <small id="resource-disk-free" class="resource-meta">Wolne: -- GB</small>
+                        </div>
+                        <button id="btn-save-resources" class="btn btn-sm btn-primary" style="width:100%;margin-top:8px">Zapisz limity</button>
+                    </div>
+                </div>
+
+                <!-- Model Download -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="model-download">Pobierz modele <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="model-download" class="section-content">
+                        <div id="download-categories" class="download-categories">
+                            <button class="dl-cat active" data-cat="all">Wszystkie</button>
+                            <button class="dl-cat" data-cat="coding">Kodowanie</button>
+                            <button class="dl-cat" data-cat="general">Ogolne</button>
+                            <button class="dl-cat" data-cat="creative">Kreatywne</button>
+                            <button class="dl-cat" data-cat="lightweight">Lekkie</button>
+                        </div>
+                        <div id="recommended-models"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Multi-Agent -->
-            <div class="sidebar-section collapsible">
-                <h3 class="section-toggle" data-target="multiagent-panel">Multi-Agent <span class="toggle-arrow">&#9660;</span></h3>
-                <div id="multiagent-panel" class="section-content">
-                    <p class="section-desc">Kilka agentow AI wspolpracuje nad zlozonym zadaniem.</p>
-                    <div class="ma-roles" id="ma-roles-list"></div>
-                    <textarea id="ma-task-input" class="ma-task-input" placeholder="Opisz zlozony problem do rozwiazania..." rows="3"></textarea>
-                    <button id="btn-run-multiagent" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">&#9881; Uruchom zespol agentow</button>
-                    <div id="ma-workflow-status" class="ma-workflow-status hidden">
-                        <div class="ma-progress-bar"><div id="ma-progress-fill" class="ma-progress-fill"></div></div>
-                        <div id="ma-progress-text" class="ma-progress-text">0%</div>
+            <!-- ═══════ TAB: CONFIG ═══════ -->
+            <div class="sidebar-tab-content" id="tab-config">
+                <!-- API Keys -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="api-keys-panel">Klucze API <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="api-keys-panel" class="section-content">
+                        <div id="api-keys-forms" class="api-keys-forms"></div>
                     </div>
-                    <div id="ma-workflows-history" class="ma-workflows-history"></div>
+                </div>
+
+                <!-- Semantic Router -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="router-panel">Semantic Router <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="router-panel" class="section-content">
+                        <div class="router-toggle-row">
+                            <span class="router-label">Auto-routing</span>
+                            <label class="switch">
+                                <input type="checkbox" id="router-enabled">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                        <div id="router-assignments" class="router-assignments">
+                            <label>Kodowanie:
+                                <select id="router-coding" class="select-full router-select">
+                                    <option value="">-- domyslny model --</option>
+                                </select>
+                            </label>
+                            <label>Analiza:
+                                <select id="router-analysis" class="select-full router-select">
+                                    <option value="">-- domyslny model --</option>
+                                </select>
+                            </label>
+                            <label>Kreatywne:
+                                <select id="router-creative" class="select-full router-select">
+                                    <option value="">-- domyslny model --</option>
+                                </select>
+                            </label>
+                            <label>Chat:
+                                <select id="router-chat" class="select-full router-select">
+                                    <option value="">-- domyslny model --</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="router-test-area">
+                            <input type="text" id="router-test-input" class="input-sm" placeholder="Testuj routing...">
+                            <button id="btn-router-test" class="btn btn-sm btn-ghost" style="margin-top:4px;width:100%">Testuj</button>
+                            <div id="router-test-result" class="router-test-result hidden"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Documents (RAG) -->
-            <div class="sidebar-section collapsible">
-                <h3 class="section-toggle" data-target="documents-panel">Dokumenty (RAG) <span class="toggle-arrow">&#9660;</span></h3>
-                <div id="documents-panel" class="section-content">
-                    <div class="doc-upload-area">
-                        <input type="file" id="doc-file-input" class="hidden" accept=".txt,.md,.py,.js,.csv,.json,.xml,.html,.log,.cfg,.ini,.yaml,.yml">
-                        <button id="btn-upload-doc" class="btn btn-sm btn-primary" style="width:100%">&#128196; Zaladuj dokument</button>
+            <!-- ═══════ TAB: TOOLS ═══════ -->
+            <div class="sidebar-tab-content" id="tab-tools">
+                <!-- Multi-Agent -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="multiagent-panel">Multi-Agent <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="multiagent-panel" class="section-content">
+                        <p class="section-desc">Kilka agentow AI wspolpracuje nad zlozonym zadaniem.</p>
+                        <div class="ma-roles" id="ma-roles-list"></div>
+                        <textarea id="ma-task-input" class="ma-task-input" placeholder="Opisz zlozony problem do rozwiazania..." rows="3"></textarea>
+                        <button id="btn-run-multiagent" class="btn btn-sm btn-primary" style="width:100%;margin-top:6px">&#9881; Uruchom zespol agentow</button>
+                        <div id="ma-workflow-status" class="ma-workflow-status hidden">
+                            <div class="ma-progress-bar"><div id="ma-progress-fill" class="ma-progress-fill"></div></div>
+                            <div id="ma-progress-text" class="ma-progress-text">0%</div>
+                        </div>
+                        <div id="ma-workflows-history" class="ma-workflows-history"></div>
                     </div>
-                    <div id="documents-list" class="documents-list"></div>
+                </div>
+
+                <!-- Documents (RAG) -->
+                <div class="sidebar-section">
+                    <h3 class="section-toggle" data-target="documents-panel">Dokumenty (RAG) <span class="toggle-arrow">&#9660;</span></h3>
+                    <div id="documents-panel" class="section-content">
+                        <div class="doc-upload-area">
+                            <input type="file" id="doc-file-input" class="hidden" accept=".txt,.md,.py,.js,.csv,.json,.xml,.html,.log,.cfg,.ini,.yaml,.yml">
+                            <button id="btn-upload-doc" class="btn btn-sm btn-primary" style="width:100%">&#128196; Zaladuj dokument</button>
+                        </div>
+                        <div id="documents-list" class="documents-list"></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- System Info -->
-            <div class="sidebar-section">
+            <!-- System Info (always visible) -->
+            <div class="sidebar-footer">
                 <div id="system-info" class="system-info">
-                    <small>NeuroForge v0.6.0</small>
+                    <small>NeuroForge v0.7.0</small>
                 </div>
             </div>
         </aside>
@@ -304,6 +365,8 @@
                     <button class="template-cat" data-cat="coding">Kodowanie</button>
                     <button class="template-cat" data-cat="text">Tekst</button>
                     <button class="template-cat" data-cat="tools">Narzedzia</button>
+                    <button class="template-cat" data-cat="analysis">Analiza</button>
+                    <button class="template-cat" data-cat="creative">Kreatywne</button>
                 </div>
                 <div id="templates-grid" class="templates-grid"></div>
             </div>
@@ -382,6 +445,37 @@
                         </div>
                     </div>
                     <p class="hint">Zaladuj model lub podlacz API, zeby zaczac.</p>
+                </div>
+            </div>
+
+            <!-- Chat Toolbar (AI capabilities toggles) -->
+            <div id="chat-toolbar" class="chat-toolbar">
+                <div class="toolbar-toggles">
+                    <label class="toolbar-toggle" title="Dostep do internetu - wyszukiwanie i pobieranie stron">
+                        <input type="checkbox" id="cap-internet" checked>
+                        <span class="toolbar-toggle-icon">&#127760;</span>
+                        <span class="toolbar-toggle-label">Internet</span>
+                    </label>
+                    <label class="toolbar-toggle" title="Wykonywanie kodu Python/JS">
+                        <input type="checkbox" id="cap-code-exec" checked>
+                        <span class="toolbar-toggle-icon">&#128187;</span>
+                        <span class="toolbar-toggle-label">Kod</span>
+                    </label>
+                    <label class="toolbar-toggle" title="Odczyt i zapis plikow">
+                        <input type="checkbox" id="cap-filesystem" checked>
+                        <span class="toolbar-toggle-icon">&#128193;</span>
+                        <span class="toolbar-toggle-label">Pliki</span>
+                    </label>
+                    <label class="toolbar-toggle" title="Komendy powloki systemowej">
+                        <input type="checkbox" id="cap-shell" checked>
+                        <span class="toolbar-toggle-icon">&#9000;</span>
+                        <span class="toolbar-toggle-label">Shell</span>
+                    </label>
+                    <label class="toolbar-toggle" title="Wyszukiwanie w zaindeksowanych dokumentach">
+                        <input type="checkbox" id="cap-rag" checked>
+                        <span class="toolbar-toggle-icon">&#128196;</span>
+                        <span class="toolbar-toggle-label">RAG</span>
+                    </label>
                 </div>
             </div>
 

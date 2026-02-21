@@ -15,7 +15,7 @@ set "DATA_DIR=%SCRIPT_DIR%\data"
 set "REQ_FILE=%SCRIPT_DIR%\requirements.txt"
 
 echo ============================================================
-echo   NeuroForge - Local AI Agent Studio v0.6.0
+echo   NeuroForge - Local AI Agent Studio v0.7.0
 echo ============================================================
 echo.
 

@@ -1,7 +1,9 @@
 /**
- * NeuroForge - Frontend Application v0.3.0
+ * NeuroForge - Frontend Application v0.7.0
  * Handles WebSocket chat, model management, conversation history,
- * system monitor, prompt templates, RAG, and file upload.
+ * system monitor, prompt templates, RAG, file upload, sidebar tabs,
+ * chat toolbar capabilities, resource panel, download cancel,
+ * and multi-agent role model selection.
  */
 
 // ──── State ────
@@ -14,6 +16,14 @@ const state = {
     sending: false,
     monitorOpen: false,
     attachedFile: null,
+    activeDownloads: {},  // filename -> AbortController
+    capabilities: {
+        internet: true,
+        code_exec: true,
+        filesystem: true,
+        shell: true,
+        rag: true,
+    },
 };
 
 // ──── DOM Elements ────
@@ -47,6 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadProviders();
     loadAgentRoles();
     setupEventListeners();
+    setupSidebarTabs();
+    setupChatToolbar();
+    setupResourcePanel();
     startMiniMonitor();
 });
 
@@ -488,6 +501,21 @@ async function downloadModelWithProgress(repo, filename, btn, card) {
     const progressEl = card.querySelector(`#dl-progress-${safeId}`);
     if (progressEl) progressEl.classList.remove('hidden');
 
+    // Create AbortController for cancel support
+    const abortController = new AbortController();
+    state.activeDownloads[filename] = abortController;
+
+    // Add cancel button
+    let cancelBtn = card.querySelector('.btn-cancel-download');
+    if (!cancelBtn) {
+        cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn-cancel-download';
+        cancelBtn.textContent = 'Anuluj pobieranie';
+        cancelBtn.addEventListener('click', () => cancelDownload(filename));
+        if (progressEl) progressEl.after(cancelBtn);
+    }
+    cancelBtn.classList.remove('hidden');
+
     const startTime = Date.now();
     let fill, pctEl, speedEl, etaEl;
     if (progressEl) {
@@ -502,6 +530,7 @@ async function downloadModelWithProgress(repo, filename, btn, card) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ repo, filename }),
+            signal: abortController.signal,
         });
 
         if (!resp.ok) {
@@ -571,18 +600,40 @@ async function downloadModelWithProgress(repo, filename, btn, card) {
             btn.textContent = 'Pobrano!';
             btn.className = 'downloaded';
             btn.disabled = true;
+            cancelBtn.classList.add('hidden');
             loadModels();
         }
     } catch (e) {
-        if (progressEl) {
-            fill.style.width = '0%';
-            pctEl.textContent = 'Blad';
-            speedEl.textContent = '';
-            etaEl.textContent = '';
+        if (e.name === 'AbortError') {
+            if (progressEl) {
+                fill.style.width = '0%';
+                pctEl.textContent = 'Anulowano';
+                speedEl.textContent = '';
+                etaEl.textContent = '';
+            }
+            btn.textContent = 'Ponow';
+            btn.disabled = false;
+        } else {
+            if (progressEl) {
+                fill.style.width = '0%';
+                pctEl.textContent = 'Blad';
+                speedEl.textContent = '';
+                etaEl.textContent = '';
+            }
+            btn.textContent = 'Ponow';
+            btn.disabled = false;
+            alert('Blad pobierania: ' + e.message);
         }
-        btn.textContent = 'Ponow';
-        btn.disabled = false;
-        alert('Blad pobierania: ' + e.message);
+    } finally {
+        delete state.activeDownloads[filename];
+        cancelBtn.classList.add('hidden');
+    }
+}
+
+function cancelDownload(filename) {
+    const controller = state.activeDownloads[filename];
+    if (controller) {
+        controller.abort();
     }
 }
 
@@ -1779,21 +1830,116 @@ const ROLE_COLORS = {
 
 let _maWorkflowActive = false;
 
+let _agentRolesData = [];
+
 async function loadAgentRoles() {
     try {
         const resp = await fetch('/api/agents/roles');
         const data = await resp.json();
-        const container = $('ma-roles-list');
-        container.innerHTML = '';
-        for (const role of data.roles) {
-            const badge = document.createElement('span');
-            badge.className = 'ma-role-badge';
-            badge.title = role.description;
-            badge.innerHTML = `<span class="ma-role-dot" style="background:${role.color}"></span>${role.name}`;
-            container.appendChild(badge);
-        }
+        _agentRolesData = data.roles || [];
+        renderAgentRoles();
     } catch (e) {
         console.error('Failed to load agent roles:', e);
+    }
+}
+
+function renderAgentRoles() {
+    const container = $('ma-roles-list');
+    container.innerHTML = '';
+    container.className = 'ma-role-config';
+
+    // Build model options from available local models + providers
+    const modelOptions = buildModelOptionsList();
+
+    for (const role of _agentRolesData) {
+        const row = document.createElement('div');
+        row.className = 'ma-role-row';
+
+        let optionsHtml = '<option value="">-- auto --</option>';
+        for (const mo of modelOptions) {
+            const selected = (role.preferred_provider && role.preferred_model)
+                ? (mo.value === `${role.preferred_provider}:${role.preferred_model}` ? ' selected' : '')
+                : '';
+            optionsHtml += `<option value="${escapeHtml(mo.value)}"${selected}>${escapeHtml(mo.label)}</option>`;
+        }
+
+        row.innerHTML = `
+            <span class="ma-role-dot" style="background:${role.color}"></span>
+            <span class="ma-role-name" title="${escapeHtml(role.description)}">${escapeHtml(role.name)}</span>
+            <select class="ma-role-select" data-role="${escapeHtml(role.role_id)}">
+                ${optionsHtml}
+            </select>
+        `;
+        container.appendChild(row);
+    }
+
+    // Bind change events for role model selection
+    container.querySelectorAll('.ma-role-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const roleId = sel.dataset.role;
+            const val = sel.value;
+            updateRoleModel(roleId, val);
+        });
+    });
+}
+
+function buildModelOptionsList() {
+    const options = [];
+
+    // Local models from the model-select dropdown
+    const modelSel = $('model-select');
+    if (modelSel) {
+        for (const opt of modelSel.options) {
+            if (opt.value) {
+                options.push({
+                    value: `local:${opt.value}`,
+                    label: `[Lokalny] ${opt.textContent}`,
+                });
+            }
+        }
+    }
+
+    // Cloud provider models
+    if (_providersData && _providersData.providers) {
+        for (const p of _providersData.providers) {
+            if (p.id === 'local') continue;
+            if (!p.has_api_key && p.requires_api_key) continue;
+            if (p.models && p.models.length > 0) {
+                for (const m of p.models) {
+                    options.push({
+                        value: `${p.id}:${m.id}`,
+                        label: `[${p.name}] ${m.name}`,
+                    });
+                }
+            }
+        }
+    }
+
+    return options;
+}
+
+async function updateRoleModel(roleId, value) {
+    if (!value) {
+        // Reset to auto
+        await fetch('/api/agents/roles/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role_id: roleId, provider: null, model: null }),
+        }).catch(e => console.error('Failed to update role:', e));
+        return;
+    }
+
+    const [provider, ...modelParts] = value.split(':');
+    const model = modelParts.join(':');
+
+    try {
+        await fetch('/api/agents/roles/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role_id: roleId, provider, model }),
+        });
+    } catch (e) {
+        console.error('Failed to update role model:', e);
     }
 }
 
@@ -2013,6 +2159,211 @@ function appendWorkflowMessage(result) {
     scrollToBottom();
 }
 
+// ──── Sidebar Tabs ────
+
+function setupSidebarTabs() {
+    document.querySelectorAll('.sidebar-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Deactivate all tabs
+            document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.sidebar-tab-content').forEach(c => c.classList.remove('active'));
+
+            // Activate clicked tab
+            tab.classList.add('active');
+            const targetId = tab.dataset.tab;
+            const target = document.getElementById(targetId);
+            if (target) target.classList.add('active');
+        });
+    });
+}
+
+// ──── Chat Toolbar (AI Capabilities) ────
+
+function setupChatToolbar() {
+    const caps = {
+        'cap-internet': 'internet',
+        'cap-code-exec': 'code_exec',
+        'cap-filesystem': 'filesystem',
+        'cap-shell': 'shell',
+        'cap-rag': 'rag',
+    };
+
+    // Load saved preferences from localStorage
+    const saved = localStorage.getItem('nf-capabilities');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            Object.assign(state.capabilities, parsed);
+        } catch (e) { /* ignore */ }
+    }
+
+    // Set initial checkbox states
+    for (const [elId, capKey] of Object.entries(caps)) {
+        const el = $(elId);
+        if (el) {
+            el.checked = state.capabilities[capKey] !== false;
+            el.addEventListener('change', () => {
+                state.capabilities[capKey] = el.checked;
+                localStorage.setItem('nf-capabilities', JSON.stringify(state.capabilities));
+                // Notify backend about capability change
+                syncCapabilities();
+            });
+        }
+    }
+
+    // Initial sync
+    syncCapabilities();
+}
+
+async function syncCapabilities() {
+    try {
+        await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                config: {
+                    tools: {
+                        web_search: state.capabilities.internet,
+                        web_fetch: state.capabilities.internet,
+                        execute_code: state.capabilities.code_exec,
+                        read_file: state.capabilities.filesystem,
+                        run_command: state.capabilities.shell,
+                        search_documents: state.capabilities.rag,
+                    }
+                }
+            }),
+        });
+    } catch (e) {
+        // Silent fail - non-critical
+    }
+}
+
+// ──── Resource Settings Panel ────
+
+function setupResourcePanel() {
+    // GPU VRAM slider
+    const gpuSlider = $('resource-gpu-limit');
+    const gpuVal = $('resource-gpu-limit-val');
+    if (gpuSlider) {
+        gpuSlider.addEventListener('input', () => {
+            gpuVal.textContent = gpuSlider.value + '%';
+        });
+    }
+
+    // RAM slider
+    const ramSlider = $('resource-ram-limit');
+    const ramVal = $('resource-ram-limit-val');
+    if (ramSlider) {
+        ramSlider.addEventListener('input', () => {
+            ramVal.textContent = ramSlider.value + '%';
+        });
+    }
+
+    // Save button
+    const saveBtn = $('btn-save-resources');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveResourceLimits);
+    }
+
+    // Load saved limits from config
+    loadResourceLimits();
+
+    // Start resource info updates (every 5s alongside mini monitor)
+    updateResourceInfo();
+    setInterval(updateResourceInfo, 5000);
+}
+
+async function loadResourceLimits() {
+    try {
+        const resp = await fetch('/api/config');
+        const config = await resp.json();
+        const resources = config.resources || {};
+
+        if (resources.gpu_vram_limit !== undefined) {
+            $('resource-gpu-limit').value = resources.gpu_vram_limit;
+            $('resource-gpu-limit-val').textContent = resources.gpu_vram_limit + '%';
+        }
+        if (resources.ram_limit !== undefined) {
+            $('resource-ram-limit').value = resources.ram_limit;
+            $('resource-ram-limit-val').textContent = resources.ram_limit + '%';
+        }
+    } catch (e) {
+        // Silent fail
+    }
+}
+
+async function saveResourceLimits() {
+    const gpuLimit = parseInt($('resource-gpu-limit').value);
+    const ramLimit = parseInt($('resource-ram-limit').value);
+
+    try {
+        await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                config: {
+                    resources: {
+                        gpu_vram_limit: gpuLimit,
+                        ram_limit: ramLimit,
+                    }
+                }
+            }),
+        });
+
+        const btn = $('btn-save-resources');
+        const orig = btn.textContent;
+        btn.textContent = 'Zapisano!';
+        btn.style.background = 'var(--success)';
+        setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.background = '';
+        }, 2000);
+    } catch (e) {
+        alert('Blad zapisu limitow');
+    }
+}
+
+async function updateResourceInfo() {
+    try {
+        const resp = await fetch('/api/monitor');
+        const data = await resp.json();
+
+        // GPU VRAM
+        if (data.gpu) {
+            const vramTotal = data.gpu.vram_total_gb;
+            const vramUsed = data.gpu.vram_used_gb;
+            if (vramTotal && vramTotal !== 'N/A') {
+                const pct = Math.round((vramUsed / vramTotal) * 100);
+                $('resource-gpu-info').textContent = `${vramUsed} / ${vramTotal} GB`;
+                $('resource-gpu-fill').style.width = pct + '%';
+            } else if (data.gpu.gpu_use_percent !== undefined && data.gpu.gpu_use_percent !== 'N/A') {
+                $('resource-gpu-info').textContent = `${data.gpu.vendor || 'GPU'} ${data.gpu.gpu_use_percent}%`;
+                $('resource-gpu-fill').style.width = data.gpu.gpu_use_percent + '%';
+            }
+        }
+
+        // RAM
+        if (data.ram) {
+            const ramTotal = data.ram.total_gb || 0;
+            const ramUsed = data.ram.used_gb || 0;
+            $('resource-ram-info').textContent = `${ramUsed} / ${ramTotal} GB`;
+            $('resource-ram-fill').style.width = (data.ram.percent || 0) + '%';
+        }
+
+        // Disk
+        if (data.disk) {
+            const diskTotal = data.disk.total_gb || 0;
+            const diskUsed = data.disk.used_gb || 0;
+            const diskFree = data.disk.free_gb || (diskTotal - diskUsed);
+            $('resource-disk-info').textContent = `${diskUsed} / ${diskTotal} GB`;
+            $('resource-disk-fill').style.width = (data.disk.percent || 0) + '%';
+            $('resource-disk-free').textContent = `Wolne: ${diskFree} GB`;
+        }
+    } catch (e) {
+        // Silent fail
+    }
+}
+
 // Expose for inline event handlers
 window.downloadModel = downloadModel;
 window.removeDocument = removeDocument;
@@ -2023,3 +2374,4 @@ window.copyCodeBlock = copyCodeBlock;
 window.exportConversation = exportConversation;
 window.deleteConversation = deleteConversation;
 window.toggleWorkflowPanel = toggleWorkflowPanel;
+window.cancelDownload = cancelDownload;
